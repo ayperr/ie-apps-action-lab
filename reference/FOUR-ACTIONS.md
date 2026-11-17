@@ -30,17 +30,22 @@ No requiere una API key, pero sí un cliente de correo configurado o una cuenta 
 ## 2. Crear una tarjeta real en Trello
 
 1. Crea un tablero y una lista de prácticas en tu propio workspace Free. No incorpores a toda la clase a un mismo workspace: el plan Free admite hasta 10 colaboradores por workspace.
-2. Abre el [administrador de apps de Trello](https://trello.com/apps/admin), siguiendo el flujo vigente desde octubre de 2026, y obtén la API key de tu integración. No necesitas construir una app visual ni una interfaz con iframe.
-3. Autoriza un token con permisos **read y write**, con caducidad de **un día** para esta prueba. El token puede actuar sobre los tableros accesibles de esa cuenta: configurarlo para una lista en la app no limita por sí mismo el permiso del token a esa lista. Usa una cuenta o espacio de prácticas y revócalo al terminar.
-4. Identifica el ID de la lista de destino y configura:
+2. Abre el [administrador de apps de Trello](https://trello.com/apps/admin), crea una app y elige **My app doesn't use Power-up capabilities**. Completa el nombre **IE Action Lab**, tu **Workspace** y los campos de **email** solicitados.
+3. Entra en la pestaña **Trello Auth** y pulsa **Generate a new Trello Auth API key for this app**. Guarda la API key directamente en Vercel como `TRELLO_API_KEY`.
+4. Pulsa **Token**. Comprueba la cuenta, los permisos **read y write** y la duración mostrada; después pulsa **Allow**. Guarda el token que aparece directamente en Vercel como `TRELLO_TOKEN`.
+5. Identifica la lista de destino: crea una tarjeta temporal en esa lista, ábrela y añade `.json` al final de su URL. Busca `idList` y copia su valor sin comillas como `TRELLO_LIST_ID`. Ese es el ID de la lista; no uses el ID de la tarjeta.
+
+**La ruta es Trello Auth, no OAuth 2.0.** Solo necesitas la **API key** y el **Token**: este flujo manual no utiliza Secret, Client ID, callback ni Allowed origins. Si ya existe la app, empieza en su pestaña Trello Auth.
+
+Para el taller es preferible una autorización de un día; si el enlace Token ofrece otra duración, revisa el permiso antes de aceptarlo y pide ayuda para cambiarlo. El token puede actuar sobre los tableros accesibles de la cuenta, aunque la app tenga una única lista configurada. Revócalo al terminar. [Documentación oficial de autorización](https://developer.atlassian.com/cloud/trello/guides/rest-api/authorization/).
 
 | Variable | Valor |
 | --- | --- |
-| `TRELLO_API_KEY` | API key de la integración. |
-| `TRELLO_TOKEN` | Token autorizado de prácticas. |
+| `TRELLO_API_KEY` | API key generada en la pestaña Trello Auth. |
+| `TRELLO_TOKEN` | Token mostrado después de pulsar Allow. |
 | `TRELLO_LIST_ID` | ID de la lista propia donde puede crearse la tarjeta. |
 
-**Prueba que cuenta:** crear desde el panel, recuperar la tarjeta y abrir su URL real para comprobar contenido y lista.
+**Prueba que cuenta:** crear desde el panel, recuperar la tarjeta y abrir su URL real para comprobar contenido y lista. Guardar la API key y el token solo prepara la conexión; no demuestra todavía que la creación funcione.
 
 ## 3. Enviar un email real a tu propia dirección
 
