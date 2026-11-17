@@ -28,14 +28,14 @@ export function mintFinding(data,input){
 }
 
 export function createMintEmailService({env=process.env,fetchImpl=fetch,loadData,transports={}}={}){
-  const config=resendConfigFromEnv(env);
-  const authorizationConfigured=typeof env.LAB_ACCESS_KEY==='string'&&env.LAB_ACCESS_KEY.length>=32&&env.LAB_ACCESS_KEY.length<=256;
-  const authorized=header=>authorizationConfigured&&typeof header==='string'&&header.startsWith('Bearer ')&&timingSafeEqual(Buffer.from(hash(header.slice(7)),'hex'),Buffer.from(hash(env.LAB_ACCESS_KEY),'hex'));
+  const emailConfig=()=>resendConfigFromEnv(env);
+  const authorizationReady=()=>typeof env.LAB_ACCESS_KEY==='string'&&env.LAB_ACCESS_KEY.length>=32&&env.LAB_ACCESS_KEY.length<=256;
+  const authorized=header=>authorizationReady()&&typeof header==='string'&&header.startsWith('Bearer ')&&timingSafeEqual(Buffer.from(hash(header.slice(7)),'hex'),Buffer.from(hash(env.LAB_ACCESS_KEY),'hex'));
   const missing=()=>['RESEND_API_KEY','LAB_EMAIL_TO','LAB_ACCESS_KEY'].filter(k=>!env[k]?.trim());
   const invalid=()=>[
     env.RESEND_API_KEY&&!/^re_[A-Za-z0-9_-]{8,512}$/.test(env.RESEND_API_KEY)&&'RESEND_API_KEY',
     env.LAB_EMAIL_TO&&(!emailPattern.test(env.LAB_EMAIL_TO)||env.LAB_EMAIL_TO.toLowerCase().endsWith('@resend.dev'))&&'LAB_EMAIL_TO',
-    env.LAB_ACCESS_KEY&&!authorizationConfigured&&'LAB_ACCESS_KEY'
+    env.LAB_ACCESS_KEY&&!authorizationReady()&&'LAB_ACCESS_KEY'
   ].filter(Boolean);
   const options={fetchImpl,timeoutMs:12000};
   const transport={createResendEmail,verifyResendEmail,...transports};
@@ -49,14 +49,15 @@ export function createMintEmailService({env=process.env,fetchImpl=fetch,loadData
   function forMetric(data,input){const finding=mintFinding(data,input.scope);finding.fingerprint=hash(finding.fingerprint+input.metric);return finding;}
   function sourceFooter(finding,metric){return `\n\nSource scope:\n${finding.context}\nSelected KPI: ${labels[metric]}\nDeparture IDs: ${finding.flightIds.join(', ')}\nSnapshot fingerprint: ${finding.fingerprint}\nOpen the scoped overview: https://mint-revenue-lab.vercel.app/?${new URLSearchParams(finding.scope)}`;}
   function status(header){
-    const authenticated=authorized(header),configured=validateResendDestination(config)&&authorizationConfigured;
+    const config=emailConfig(),authorizationConfigured=authorizationReady(),authenticated=authorized(header),configured=validateResendDestination(config)&&authorizationConfigured;
     return answer(200,'connection',configured?(authenticated?'Email configured; lab access verified. Sending and provider readback still require a reviewed action.':'Email configured. Enter the lab access phrase to authorize sending.'):'Email setup needs attention.',{configured,authenticated,missing:missing(),invalid:invalid(),authorizationConfigured,recipient:authenticated?config.to||'':'',sender:'onboarding@resend.dev'});
   }
   async function submit(input,header){
+    const config=emailConfig();
     if(!allowed(input,['operation','scope','metric','draft','fingerprint','confirmed','requestId'])||!['preview','execute'].includes(input.operation)||!Object.hasOwn(labels,input.metric))return answer(400,'rejected','Choose a supported overview finding.');
     if(input.draft!==undefined&&(!allowed(input.draft,['to','subject','body'])||!emailPattern.test(input.draft.to||'')||input.draft.to.length>254||typeof input.draft.subject!=='string'||!input.draft.subject.trim()||input.draft.subject.length>200||/[\r\n\0]/.test(input.draft.subject)||typeof input.draft.body!=='string'||!input.draft.body.trim()||input.draft.body.length>8000||input.draft.body.includes('\0')))return answer(400,'rejected','Enter one valid recipient, a subject and a message within the stated limits.');
     if(input.operation==='execute'){
-      if(!validateResendDestination(config)||!authorizationConfigured)return answer(503,'unconfigured','Configure valid server settings before sending.',{missing:missing()});
+      if(!validateResendDestination(config)||!authorizationReady())return answer(503,'unconfigured','Configure valid server settings before sending.',{missing:missing()});
       if(!authorized(header))return answer(401,'rejected','Enter the correct lab access phrase. No email was sent.');
       if(input.confirmed!==true||!uuid.test(input.requestId||'')||typeof input.fingerprint!=='string'||!input.draft)return answer(400,'rejected','Review and explicitly confirm the exact email before sending.');
       if(input.draft.to.toLowerCase()!==config.to.toLowerCase())return answer(403,'rejected','The test sender permits only LAB_EMAIL_TO, your configured Resend account address.');
@@ -66,7 +67,7 @@ export function createMintEmailService({env=process.env,fetchImpl=fetch,loadData
         return previous.digest===digest?previous.promise:answer(409,'rejected','This request ID belongs to different reviewed content.');
       }
       // Provider idempotency is also scoped by request ID. Unknown outcomes are never retried here.
-      const promise=execute(input);requests.set(input.requestId,{digest,promise});
+      const promise=execute(input,config);requests.set(input.requestId,{digest,promise});
       if(requests.size>200)requests.delete(requests.keys().next().value);
       return promise;
     }
@@ -76,7 +77,7 @@ export function createMintEmailService({env=process.env,fetchImpl=fetch,loadData
       return answer(200,'preview','No email has been sent.',{...finding,sourceFooter:sourceFooter(finding,input.metric),metric:input.metric,label:labels[input.metric],draft:input.draft||{to:authorized(header)?config.to||'':'',subject:`[Synthetic Mint] ${labels[input.metric]}: ${display} | ${finding.scope.asof}`,body:`Selected finding: ${labels[input.metric]} — ${display}\n\n${finding.body}`},connection:status(header).body});
     }catch{return answer(422,'unavailable','Could not establish a valid current Mint cohort. Check the filters and data connection.');}
   }
-  async function execute(input){
+  async function execute(input,config){
     let finding;
     try{finding=forMetric(await getData(),input);}catch{return answer(503,'unavailable','Current Mint data could not be verified. No email was sent.');}
     if(finding.fingerprint!==input.fingerprint)return answer(409,'stale','The source facts changed after review. Refresh and review a new preview. No email was sent.');
