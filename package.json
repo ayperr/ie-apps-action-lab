@@ -10,6 +10,6 @@
     "dev": "node scripts/server.mjs",
     "start": "node scripts/server.mjs",
     "build": "node scripts/build.mjs",
-    "test": "node --test tests/*.test.mjs reference/github-issue.test.mjs"
+    "test": "node --test tests/*.test.mjs reference/*.test.mjs"
   }
 }

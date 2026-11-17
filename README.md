@@ -8,6 +8,12 @@ The dashboard, 24 synthetic orders, review interface, server integration, receip
 
 [Open the live app](https://ie-apps-action-lab.vercel.app) · [Visual guide](https://ie-apps-action-lab.vercel.app/guide.html) · [Download the complete ZIP](https://ie-lessons-tracker.vercel.app/apps-lab-starter.zip)
 
+## Instructor integration preflight
+
+The separate `/preflight.html` page prepares a mail/Teams draft and can test a real Trello card, a Resend email to your own address, and a GitHub pull request with a one-file policy diff. These privileged tests are disabled until you configure your own server credentials and a test-panel access phrase. See [the setup and evidence guide](reference/FOUR-ACTIONS.md) and [.env.example](.env.example). The existing ntfy demo remains available while these providers are configured.
+
+The GitHub transport has passed a real create/read-back test in an isolated private-repository fixture. Trello, Resend and external draft opening still need account-specific end-to-end checks; mocked tests do not establish provider access or free-plan eligibility. The policy fixture is illustrative and is not yet consumed by the dashboard. Use the repository for this preflight; the portal ZIP is updated separately.
+
 ## Make your own copy
 
 1. Click **Deploy with Vercel**, sign in and choose your own GitHub account for the copied repository. If settings are requested, use framework **Other**, build command **npm run build** and output directory **public**. No environment variables are required for the included ntfy integration.

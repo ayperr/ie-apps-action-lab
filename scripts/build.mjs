@@ -2,7 +2,7 @@ import { readFile, access } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const publicUrl = new URL("../public/", import.meta.url);
-const required = ["index.html", "styles.css", "app.js", "data.json", "guide.html"];
+const required = ["index.html", "styles.css", "app.js", "data.json", "guide.html", "preflight.html", "preflight.js", "preflight.css"];
 for (const path of required) await access(new URL(path, publicUrl));
 const data = JSON.parse(await readFile(new URL("data.json", publicUrl), "utf8"));
 if (!data || typeof data !== "object") throw new Error("data.json must contain the synthetic dataset.");

@@ -6,6 +6,7 @@ import createIssueHandler from "../api/create-issue.js";
 import receiverHandler from "../api/receiver.js";
 import sendEventHandler from "../api/send-event.js";
 import verifyEventHandler from "../api/verify-event.js";
+import actionPreflightHandler from "../api/action-preflight.js";
 
 const defaultPublicDir = fileURLToPath(new URL("../public/", import.meta.url));
 const contentTypes = {
@@ -38,7 +39,7 @@ export function createLabServer({ publicDir = defaultPublicDir } = {}) {
       createIssueHandler(req, res);
       return;
     }
-    const apiRoute = { "/api/receiver": receiverHandler, "/api/send-event": sendEventHandler, "/api/verify-event": verifyEventHandler }[pathname];
+    const apiRoute = { "/api/receiver": receiverHandler, "/api/send-event": sendEventHandler, "/api/verify-event": verifyEventHandler, "/api/action-preflight": actionPreflightHandler }[pathname];
     if (apiRoute) {
       await apiRoute(req, res);
       return;
