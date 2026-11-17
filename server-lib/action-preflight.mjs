@@ -2,7 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { trelloConfigFromEnv, validateTrelloDestination, createTrelloCard, verifyTrelloCard } from "../reference/trello-card.mjs";
 import { resendConfigFromEnv, validateResendDestination, createResendEmail, verifyResendEmail } from "../reference/resend-email.mjs";
 import { createGithubPrClient, POLICY_FILE } from "../reference/github-pr.mjs";
-import { supabaseConfigFromEnv, validateSupabaseConfig, readSupabaseReview, writeSupabaseReview } from "../reference/supabase-writeback.mjs";
+import { supabaseConfigFromEnv, readSupabaseReview, writeSupabaseReview } from "../reference/supabase-writeback.mjs";
 
 export const RECORD = Object.freeze({ id: "NS-1041", product: "Summit desk bundle", revenue: 1200, cost: 1320, refund: 0, contribution: -120 });
 const BODY = "Synthetic classroom test — no customer data.\n\nOrder: NS-1041 · Summit desk bundle\nRevenue: USD 1,200\nProduct cost: USD 1,320\nRefunds: USD 0\nContribution: USD -120 (-10%)\n\nPlease review the recorded price, introductory discount and freight allocation before recommending a correction. This is a review request, not a confirmed error.";
@@ -14,6 +14,13 @@ export const PREVIEWS = Object.freeze({
 });
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const ACTIONS = new Set(["trello", "email", "github", "supabase"]);
+const REQUIRED_ENV = Object.freeze({
+  trello: ["TRELLO_API_KEY", "TRELLO_TOKEN", "TRELLO_LIST_ID"],
+  email: ["RESEND_API_KEY", "LAB_EMAIL_TO"],
+  github: ["LAB_GITHUB_TOKEN", "LAB_GITHUB_REPOSITORY"],
+  supabase: ["LAB_SUPABASE_URL"],
+});
+const hasValue = (value) => typeof value === "string" && value.trim().length > 0;
 const hash = (value) => createHash("sha256").update(value).digest();
 
 function githubConfig(env) {
@@ -31,13 +38,18 @@ export function createPreflightService({ env = process.env, transports = {} } = 
   const github = githubConfig(env);
   const supabase = supabaseConfigFromEnv(env);
   const authorizationConfigured = typeof env.LAB_ACCESS_KEY === "string" && env.LAB_ACCESS_KEY.length >= 24;
-  const enabled = env.LAB_PREFLIGHT_ENABLED === "true" && authorizationConfigured;
+  // Actions are always available to try. Configuration and authorization are checked per request.
+  const enabled = true;
   // This only coalesces requests in one running instance. It is not a durable ledger.
   const requests = new Map();
   const functions = { createTrelloCard, verifyTrelloCard, createResendEmail, verifyResendEmail, createGithubPrClient, readSupabaseReview, writeSupabaseReview, ...transports };
-  const configured = { trello: validateTrelloDestination(trello), email: validateResendDestination(email), github: githubReady(github), supabase: validateSupabaseConfig(supabase) };
+  const configured = {
+    trello: validateTrelloDestination(trello), email: validateResendDestination(email), github: githubReady(github),
+    // The shared access phrase is checked separately after the selected provider's configuration.
+    supabase: typeof supabase.url === "string" && /^https:\/\/[a-z0-9]{20}\.supabase\.co$/.test(supabase.url),
+  };
   function authorized(header) {
-    return enabled && typeof header === "string" && header.startsWith("Bearer ") && timingSafeEqual(hash(header.slice(7)), hash(env.LAB_ACCESS_KEY));
+    return authorizationConfigured && typeof header === "string" && header.startsWith("Bearer ") && timingSafeEqual(hash(header.slice(7)), hash(env.LAB_ACCESS_KEY));
   }
   function status(header) {
     const authenticated = authorized(header);
@@ -78,12 +90,17 @@ export function createPreflightService({ env = process.env, transports = {} } = 
     return { state: read.state === "verified" ? "verified" : "unknown", provider: "github", id: made.prNumber, url: made.prUrl, verification: read.checks || null, message: read.state === "verified" ? "Real PR verified: one file changes from null to -100, with the expected branch and commit. It remains unmerged." : "The PR was created, but read-back did not establish the expected diff. Inspect it before retrying." };
   }
   async function submit(body, header) {
-    if (!enabled) return { status: 503, body: { state: "not_configured", message: "Enable the test panel and configure a server access phrase of at least 24 characters." } };
-    if (!authorized(header)) return { status: 401, body: { state: "rejected", message: "The test panel access phrase is missing or incorrect." } };
-    if (!body || typeof body !== "object" || Array.isArray(body) || !ACTIONS.has(body.action) || body.confirmed !== true || !UUID.test(body.requestId || "") || Object.keys(body).some(key => !["action", "requestId", "confirmed"].includes(key))) {
+    if (!body || typeof body !== "object" || Array.isArray(body) || !ACTIONS.has(body.action) || body.confirmed !== true || typeof body.requestId !== "string" || !UUID.test(body.requestId) || Object.keys(body).some(key => !["action", "requestId", "confirmed"].includes(key))) {
       return { status: 400, body: { state: "rejected", message: "Confirm a supported action with a valid request ID. Source data, destinations and credentials cannot be overridden by the browser." } };
     }
-    if (!configured[body.action]) return { status: 503, body: { state: "not_configured", provider: body.action, message: "This provider still needs its server-side configuration." } };
+    const missing = REQUIRED_ENV[body.action].filter(name => !hasValue(env[name]));
+    if (missing.length) return { status: 503, body: { state: "not_configured", provider: body.action, missing, message: `Missing server configuration: ${missing.join(", ")}.` } };
+    if (!configured[body.action]) {
+      const configuration = body.action === "github" ? [...REQUIRED_ENV.github, "LAB_GITHUB_BASE_BRANCH", "LAB_GITHUB_POLICY_PATH"] : REQUIRED_ENV[body.action];
+      return { status: 503, body: { state: "not_configured", provider: body.action, missing: [], configuration, message: `Invalid server configuration. Check: ${configuration.join(", ")}.` } };
+    }
+    if (!authorizationConfigured) return { status: 503, body: { state: "not_configured", provider: body.action, missing: hasValue(env.LAB_ACCESS_KEY) ? [] : ["LAB_ACCESS_KEY"], configuration: ["LAB_ACCESS_KEY"], message: "Configure LAB_ACCESS_KEY on the server with at least 24 characters; 32 or more are recommended." } };
+    if (!authorized(header)) return { status: 401, body: { state: "rejected", message: "The access phrase is missing or incorrect. Enter the value configured as LAB_ACCESS_KEY on the server." } };
     const key = `${body.action}:${body.requestId}`;
     if (requests.has(key)) return { status: 200, body: await requests.get(key) };
     if (requests.size >= 20) return { status: 429, body: { state: "rejected", message: "This running test instance has reached its demonstration limit." } };

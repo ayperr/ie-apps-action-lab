@@ -1,98 +1,94 @@
 # Northstar · Action Lab
 
-A working template that turns a dashboard signal into a **real notification**: inspect a fictional order → review the message → confirm → send to your own ntfy inbox → read it back and verify the receipt.
+A working app with four actions already implemented: **email → Supabase → Trello → GitHub**. Copy it, deploy your own version, personalize the interface and business case, connect your own accounts, then verify the real results. You do not build four APIs from scratch.
 
-The dashboard, 24 synthetic orders, review interface, server integration, receipt verification and visual workshop guide are included. Clone it, change the rules and wording, and deploy your version. No previous class project is required.
+The dashboard, 24 fictional orders, previews, confirmation and external verification are supplied. The interface, data and action buttons work immediately after cloning. You can preview and confirm an action; if its connection is missing, the app explains which server settings to add instead of contacting the provider. No previous class project is required.
+
+[Open the action panel](https://ie-apps-action-lab.vercel.app/preflight.html) · [Simple learner guide](https://ie-apps-action-lab.vercel.app/start-here.html) · [Dashboard](https://ie-apps-action-lab.vercel.app)
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fjosncmar%2Fie-apps-action-lab)
 
-[Open the live app](https://ie-apps-action-lab.vercel.app) · [Visual guide](https://ie-apps-action-lab.vercel.app/guide.html) · [Download the complete ZIP](https://ie-lessons-tracker.vercel.app/apps-lab-starter.zip)
+## Start with your own app · 35 minutes
 
-## Instructor integration preflight
+1. Click **Deploy with Vercel**, using your own GitHub account for the copied repository. If asked: Framework **Other**, build command **npm run build**, output directory **public**.
+2. Keep your own URL. Open **your URL + `/start-here.html`** and the dashboard. The interface and supplied data are ready before you add keys.
+3. Open your copied repository with your coding assistant. Personalize the design and use case before connecting services. You may use a previous class dataset or the included fictional case.
+4. Push the change, wait for Vercel to deploy it and check your own URL. Try the email/Teams draft warm-up in **`/preflight.html`**. Opening a draft does not send it.
 
-The separate `/preflight.html` page prepares a mail/Teams draft and can test four real actions: a Trello card, a Resend email to your own address, a saved review in Supabase, and a GitHub pull request with a one-file policy diff. These privileged tests are disabled until you configure your own server credentials and a test-panel access phrase. Start with [the simple connection guide](public/start-here.html), then see [the setup and evidence guide](reference/FOUR-ACTIONS.md) and [.env.example](.env.example). The existing ntfy demo remains available while these providers are configured.
+A prompt to start:
 
-The GitHub transport has passed a real create/read-back test in an isolated private-repository fixture. Trello, Resend and external draft opening still need account-specific end-to-end checks; mocked tests do not establish provider access or free-plan eligibility. The policy fixture is illustrative and is not yet consumed by the dashboard. Use the repository for this preflight; the portal ZIP is updated separately.
+> Personalize this working Northstar Action Lab for my chosen business case. First propose a simple design and explain the action each button takes. Keep the four implemented integrations, destination previews, confirmation and independent verification. Use the included fictional data unless I provide a previous class dataset. If we change the action record, update the interface AND the server record/previews consistently, and adapt the Supabase fixture and function too. Do not change only the labels while sending the old record. Keep credentials in server settings. Show me the result and the checks you performed.
 
-## Make your own copy
+The supplied NS-1041 case is the ready-to-use fallback: revenue $1,200, cost $1,320 and contribution −$120. Using your own dataset is optional. Changing the dashboard alone does not change the fixed record sent by the action panel.
 
-1. Click **Deploy with Vercel**, sign in and choose your own GitHub account for the copied repository. If settings are requested, use framework **Other**, build command **npm run build** and output directory **public**. No environment variables are required for the included ntfy integration.
-2. Open your deployment. Check the 24 orders and $19,512 net revenue, connect your own test inbox, inspect an order, review the message and explicitly confirm one real notification. Open its external inbox and verify the matching receipt in your app.
-3. Open your copied repository with your coding assistant. Change a rule, wording or message field; commit and push. Verify that your change appears on your Vercel URL.
+## Four exercises, four checkpoints
 
-To run locally, install Node.js 22 or newer, clone your repository and run `npm run dev`, then open http://127.0.0.1:3000. There are no npm dependencies. Alternatively, extract the ZIP and put its contents in a new GitHub repository with `package.json` at the root, then import it into Vercel.
+| Exercise | Time | What you do | Checkpoint |
+| --- | --- | --- | --- |
+| 1 · Email | 30 min | Connect Resend, review the message and send one email to your own account address. | A real email ID, provider status and the message in your inbox. Accepted alone is not delivered. |
+| 2 · Supabase | 35 min | Connect your practice database and save a reviewed record. | Reload and read the saved status, request ID and timestamp again. |
+| 3 · Trello | 30 min | Connect your practice list and turn the signal into a review task. | Open the real card and compare its list, title and description. |
+| 4 · GitHub | 30 min | Connect your copied repository and propose a one-file policy change. | Open the PR and inspect **Files changed**. Nothing is merged automatically. |
 
-## What works, and what you change
+With the initial 35 minutes, a 10-minute break and a 10-minute close, the workshop lasts **180 minutes**. Prepare the one-time Supabase setup with the instructor or assistant; the exercise is about connecting and checking the supplied flow. The email/Teams draft is a warm-up, not a fifth real integration exercise.
 
-| Block | Start from the included app | Your exercise |
+## Connect your own accounts
+
+Put each setting directly in **your Vercel project → Settings → Environment Variables → Production**, save, then **Deployments → latest deployment → Redeploy**. A copied project does not inherit the instructor’s accounts.
+
+Before adding provider credentials, create `LAB_ACCESS_KEY`: a random password of **at least 32 characters** saved in your password manager and Vercel. Enter that password in the action panel’s **Lab access phrase** field to authorize configured real operations. No activation flag is needed. Provider keys go only in server settings, never in chat or committed files.
+
+You can press the action buttons before setup. If a setting is missing, the result names it—for example, `RESEND_API_KEY` and `LAB_EMAIL_TO`. Add the named settings in Vercel, save, redeploy and test again. If values are present but invalid, the app identifies the settings to review. A configured service still requires your lab access phrase before any real operation.
+
+| Service | Settings in Vercel | Preparation |
 | --- | --- | --- |
-| 1. Define the action | Metrics, filters and details over 24 orders | Choose a signal and customize the rule and requested next step. |
-| 2. Review before acting | Editable preview, explicit confirmation and cancellation | Improve the message and recipient context; send one reviewed notification. |
-| 3. Connect and verify | Node API sends to ntfy and reads the message back | Inspect the payload and response; verify the real identifier and adapt a field. |
-| 4. Handle uncertainty | Separate received, rejected and unknown results; local history | Test cancellation, validation, repeated clicks and read-only verification after uncertainty. |
-| 5. Optional extension | Server transport reference for GitHub | Add an authenticated GitHub issue, another destination, or Supabase persistence. |
+| Email | `RESEND_API_KEY`, `LAB_EMAIL_TO` | A Resend **Full access** key and your own account email. Sender is already `onboarding@resend.dev`. |
+| Supabase | `LAB_SUPABASE_URL`; shared `LAB_ACCESS_KEY` | Run supplied `supabase/setup.sql` once and deploy `supabase/writeback/index.ts` as `ie-action-lab-writeback`, with the hash of your own lab password. A URL alone is not enough. |
+| Trello | `TRELLO_API_KEY`, `TRELLO_TOKEN`, `TRELLO_LIST_ID` | Your own practice list; **Trello Auth → Generate API key → Token → Allow**. |
+| GitHub | `LAB_GITHUB_TOKEN`, `LAB_GITHUB_REPOSITORY`, `LAB_GITHUB_BASE_BRANCH`, `LAB_GITHUB_POLICY_PATH` | **Only select repositories** for your copy; **Contents** and **Pull requests** read/write. **Public repositories** is read-only. |
 
-See the illustrated guide for instructions, five diagrams, screenshots, prompts and acceptance criteria. Practice mode remains available for controlled failure rehearsals; simulated results are always labelled and are not external deliveries.
+Use the [simple learner guide](https://ie-apps-action-lab.vercel.app/start-here.html) for the screens and [the instructor setup guide](reference/FOUR-ACTIONS.md) for exact values and supplied Supabase files. [.env.example](.env.example) lists the setting names. A configured connection is preparation; each checkpoint needs a real result.
 
-## Real integration and its limits
+## Verified in the instructor’s app
 
-The server creates a random inbox identifier without opening a provider account. It publishes only to the fixed `ntfy.sh` host, using a topic derived from that identifier. The message includes facts from the bundled order, a stable request ID and your reviewed title/reason. A successful HTTP response is distinct from a verified receipt: the app reads the provider's cached messages and looks for the matching request.
+On **17 November 2026**, all four real actions were checked:
 
-Use **at most two real sends per student** for the core lab. ntfy's free public service publishes limits of 250 messages per visitor/IP per day, a request burst of 60 and refill of one request per five seconds. Hosting networks may share outbound IPs. Cached messages expire after about 12 hours; an old message disappearing is not proof that it was never delivered. Recheck current limits and perform one preflight before class. Availability and free quotas cannot be guaranteed.
+- Email: provider delivery status and the message confirmed in the recipient’s inbox.
+- Supabase: saved record checked independently through SQL.
+- Trello: created and checked [card N3nb8mnq](https://trello.com/c/N3nb8mnq).
+- GitHub: created and verified [PR #1](https://github.com/josncmar/ie-apps-action-lab/pull/1) through the app interface.
 
-The random topic is an unlisted public test inbox, **not an authenticated private mailbox**. Anyone with its address can read or publish there. Use fictional data only and do not post credentials, customer information or personal messages. Neither a received notification nor a closed ticket proves the underlying business problem was resolved.
+Your copy still needs its own configuration and checks. Account billing screens were not inspected: these results do not certify a Free plan or remaining quota. The draft warm-up depends separately on each person’s email/Teams client and account.
 
-History in this starter stays in the current browser. It is not a shared database or an audit log. Looking for an existing request before sending helps with repeat calls but is not an atomic, durable exactly-once guarantee. After an uncertain result, verify the existing request instead of automatically sending it again. A production workflow needs authentication, authorization and durable server-side state; that is an optional extension here.
+If the outcome is unknown, inspect the existing result before repeating. Keep the request ID. The GitHub policy file is a teaching proposal; editing it does not yet change dashboard rules automatically. The lab access phrase protects a temporary classroom panel, not a complete production user system.
 
-## Code map
+## Optional extra: ntfy notification demo
 
-```text
-public/
-  index.html, styles.css, app.js   Dashboard, review and history
-  data.json                       24 fictional retail orders
-  guide.html, diagrams/, images/  Illustrated workshop
-api/
-  receiver.js                     Create a random test inbox identifier
-  send-event.js                   Validate and send a real notification
-  verify-event.js                 Read back the external receipt
-  create-issue.js                 Disabled GitHub teaching route (HTTP 501)
-server-lib/                       Provider transport and HTTP validation
-reference/
-  INTEGRATION.md                  Auth/persistence contract for the GitHub extension
-  github-issue.mjs                Server-side GitHub transport
-  preflight.mjs                   Explicit opt-in GitHub create/read/close check
-scripts/server.mjs                Local development server
-scripts/build.mjs                 Deployment asset checks
-vercel.json                       Deployment configuration
-```
+The dashboard also retains an **optional ntfy demo** and local practice mode. These are extra materials, not the four exercises above. The ntfy demo needs no provider account or environment variables and checks a fictional event in an unlisted test topic. Anyone with that topic can access it; use synthetic data only and at most two live sends per student. Provider availability and shared-network limits still apply.
 
-The GitHub route is not enabled by adding a token. Implement its complete authentication, authorization, persistence and dispatch contract first. Keep all future GitHub, Trello or email secrets on the server. Your assistant's connected tools do not automatically authorize your deployed app.
+Local practice results are browser-local simulations. The real Supabase exercise is the path that persists a reviewed record outside the browser. Neither simulated history nor an ntfy receipt proves another integration works.
 
-## Synthetic dataset
+## Useful files
 
-`public/data.json` contains `meta` and an `orders` array, with a fixed reference date of 2026-11-17. All names, teams and records are fictional; there are no customer identities or contact addresses.
-
-| Fields | Meaning |
+| Location | Purpose |
 | --- | --- |
-| `id` | Stable order identifier, for example `NS-1041`. |
-| `product`, `category`, `region`, `channel` | Display and filter categories. |
-| `orderDate`, `promisedDate`, `deliveredDate` | Calendar dates; an undelivered order has a null delivery date. |
-| `status`, `quantity` | Delivery status and units ordered. |
-| `revenue`, `cost`, `refund` | Order totals in USD, not unit prices. |
-| `owner`, `note` | Fictional responsible team and investigation context. |
+| `public/start-here.html` | Simple learner guide for the current four exercises. |
+| `public/preflight.html` | Draft warm-up and four real actions. |
+| `public/index.html`, `public/data.json` | Dashboard, fictional dataset and optional ntfy demo. |
+| `api/action-preflight.js`, `server-lib/action-preflight.mjs` | Server-side actions and verification. |
+| `reference/FOUR-ACTIONS.md` | Setup instructions and evidence. |
+| `supabase/setup.sql`, `supabase/writeback/index.ts` | Practice table and restricted write-back function. |
+| `classroom-fixtures/review-policy.json` | File changed by the PR exercise. |
 
-Net revenue = revenue − refund. Contribution = net revenue − cost. Margin rate uses net revenue; refund rate uses gross revenue. Attention means negative contribution, late delivery at the fixed reference date, or a refund rate of at least 25%. Count distinct flagged orders because signals can overlap.
+The legacy `api/create-issue.js` reference route is not used by the working PR exercise. Your assistant’s connected accounts do not automatically authorize the deployed app.
 
-Baseline: 24 orders, $19,512 net revenue, $7,533 contribution and 9 orders needing attention. If you change a rule, change its explanation and server-side payload consistently.
+## Optional local development
 
-## Verify your copy
+Use Node.js 22 or newer and `npm run dev`, then open http://127.0.0.1:3000. There are no npm dependencies. Your assistant can run `npm test` and `npm run build`; automated service tests use mocks and do not establish live access.
 
-```sh
-npm test
-npm run build
-```
+The included dataset has a fixed reference date of **2026-11-17**: **24 orders**, **$19,512 net revenue**, **$7,533 contribution** and **9 orders needing attention**. All records are fictional. Net revenue = revenue − refund; contribution = net revenue − cost. Count distinct flagged orders because signals can overlap.
 
-Automated transport tests use fixtures and mocked responses. They do not send real notifications or issues. After deploying, perform a single reviewed live send, verify the matching external receipt and test cancellation without a send. Use practice mode for repeated failure scenarios.
+After the workshop, clear the lab access phrase from the page and revoke temporary provider tokens you no longer need. The app remains available; configured real operations still require the lab access phrase.
 
 ## License
 

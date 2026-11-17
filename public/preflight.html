@@ -42,8 +42,8 @@
             One signal.<br /><span>Four ways to act.</span>
           </h1>
           <p class="hero-description">
-            Start with a message draft, then try four real actions: a Trello
-            card, an email, a saved Supabase review and a GitHub PR. Inspect the
+            Warm up with a message draft, then follow four exercises from
+            easiest to hardest: Email → Supabase → Trello → GitHub. Review each
             destination and exact content before confirming.
           </p>
         </div>
@@ -81,15 +81,17 @@
       <section class="access-panel" aria-labelledby="access-title">
         <div class="access-copy">
           <p class="eyebrow">BEFORE A REAL ACTION</p>
-          <h2 id="access-title">Check the connection.</h2>
+          <h2 id="access-title">Review it. Try it. See what is missing.</h2>
           <p>
-            Service credentials and destinations are configured on the server.
-            This page never asks for provider API keys.
+            Every exercise can be opened and tried. If its connection is
+            incomplete, the server tells you which settings are missing.
+            Provider API keys belong in your server settings.
           </p>
         </div>
         <div class="access-controls">
           <label for="lab-access"
-            >Lab access phrase <span>for real actions only</span></label
+            >Lab access phrase
+            <span>required by configured services</span></label
           >
           <div class="access-row">
             <input
@@ -115,7 +117,7 @@
             role="status"
             aria-live="polite"
           >
-            Connections have not been checked. Checking never triggers an
+            Loading the action previews. Checking connections never triggers an
             action.
           </p>
         </div>
@@ -130,7 +132,7 @@
             <span class="action-number">00</span
             ><span class="state-badge state-draft">Draft only</span>
           </div>
-          <p class="eyebrow">START HERE · EMAIL / TEAMS DRAFT</p>
+          <p class="eyebrow">WARM-UP · EMAIL / TEAMS DRAFT</p>
           <h2 id="draft-title">Start a conversation.</h2>
           <p class="action-description">
             Open a prefilled message in your own mail or Teams client. You
@@ -177,54 +179,11 @@
         </article>
         <article
           class="action-card"
-          data-provider="trello"
-          aria-labelledby="trello-title"
-        >
-          <div class="card-heading">
-            <span class="action-number">01</span
-            ><span id="trello-state" class="state-badge">Not checked</span>
-          </div>
-          <p class="eyebrow">TRELLO</p>
-          <h2 id="trello-title">Create a review card.</h2>
-          <p class="action-description">
-            Create one real card in the server-configured test list. Read-back
-            verification must confirm the card exists.
-          </p>
-          <div class="destination">
-            <span>Destination</span>
-            <p id="trello-destination">Check configured services first.</p>
-          </div>
-          <p id="trello-detail" class="provider-detail">
-            No action has been requested.
-          </p>
-          <details class="preview-block" id="trello-preview" hidden>
-            <summary>Review the exact card content</summary>
-            <h3 id="trello-preview-title"></h3>
-            <pre id="trello-preview-body"></pre>
-          </details>
-          <button
-            class="button primary review-action"
-            data-action="trello"
-            type="button"
-            disabled
-          >
-            Review card creation →
-          </button>
-          <div
-            id="trello-result"
-            class="action-result"
-            role="status"
-            aria-live="polite"
-            hidden
-          ></div>
-        </article>
-        <article
-          class="action-card"
           data-provider="email"
           aria-labelledby="email-title"
         >
           <div class="card-heading">
-            <span class="action-number">02</span
+            <span class="action-number">01</span
             ><span id="email-state" class="state-badge">Not checked</span>
           </div>
           <p class="eyebrow">RESEND</p>
@@ -235,7 +194,7 @@
           </p>
           <div class="destination">
             <span>Destination</span>
-            <p id="email-destination">Check configured services first.</p>
+            <p id="email-destination">Loading the server preview.</p>
           </div>
           <p id="email-detail" class="provider-detail">
             No action has been requested.
@@ -267,7 +226,7 @@
           aria-labelledby="supabase-title"
         >
           <div class="card-heading">
-            <span class="action-number">03</span
+            <span class="action-number">02</span
             ><span id="supabase-state" class="state-badge">Not checked</span>
           </div>
           <p class="eyebrow">SUPABASE</p>
@@ -279,7 +238,7 @@
           </p>
           <div class="destination">
             <span>Destination</span>
-            <p id="supabase-destination">Check configured services first.</p>
+            <p id="supabase-destination">Loading the server preview.</p>
           </div>
           <p id="supabase-detail" class="provider-detail">
             No action has been requested.
@@ -337,6 +296,49 @@
         </article>
         <article
           class="action-card"
+          data-provider="trello"
+          aria-labelledby="trello-title"
+        >
+          <div class="card-heading">
+            <span class="action-number">03</span
+            ><span id="trello-state" class="state-badge">Not checked</span>
+          </div>
+          <p class="eyebrow">TRELLO</p>
+          <h2 id="trello-title">Create a review card.</h2>
+          <p class="action-description">
+            Create one real card in the server-configured test list. Read-back
+            verification must confirm the card exists.
+          </p>
+          <div class="destination">
+            <span>Destination</span>
+            <p id="trello-destination">Loading the server preview.</p>
+          </div>
+          <p id="trello-detail" class="provider-detail">
+            No action has been requested.
+          </p>
+          <details class="preview-block" id="trello-preview" hidden>
+            <summary>Review the exact card content</summary>
+            <h3 id="trello-preview-title"></h3>
+            <pre id="trello-preview-body"></pre>
+          </details>
+          <button
+            class="button primary review-action"
+            data-action="trello"
+            type="button"
+            disabled
+          >
+            Review card creation →
+          </button>
+          <div
+            id="trello-result"
+            class="action-result"
+            role="status"
+            aria-live="polite"
+            hidden
+          ></div>
+        </article>
+        <article
+          class="action-card"
           data-provider="github"
           aria-labelledby="github-title"
         >
@@ -352,7 +354,7 @@
           </p>
           <div class="destination">
             <span>Destination</span>
-            <p id="github-destination">Check configured services first.</p>
+            <p id="github-destination">Loading the server preview.</p>
           </div>
           <p id="github-detail" class="provider-detail">
             No action has been requested.
@@ -431,7 +433,8 @@
           ></label
         >
         <p class="action-note">
-          The content and destination are locked by the server. Closing this
+          The server checks configuration and access before acting. Missing
+          settings produce an error, not a successful action. Closing this
           dialog sends nothing.
         </p>
         <div class="dialog-actions">

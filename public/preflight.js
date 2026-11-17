@@ -3,7 +3,7 @@
 
 const API = "/api/action-preflight";
 const ATTEMPTS_KEY = "northstar-preflight:v1:attempts";
-const ACTIONS = ["trello", "email", "supabase", "github"];
+const ACTIONS = ["email", "supabase", "trello", "github"];
 const LABELS = {
   trello: "Trello card",
   email: "Resend email",
@@ -33,7 +33,6 @@ const $ = (id) => document.getElementById(id);
 const model = {
   providers: {},
   previews: {},
-  enabled: false,
   authenticated: false,
   accessPhrase: "",
   authorizationConfigured: undefined,
@@ -61,16 +60,8 @@ function hasPreview(action) {
 }
 
 function canReview(action) {
-  const provider = model.providers[action];
   return Boolean(
-    model.enabled === true &&
-    model.authenticated === true &&
-    provider?.configured === true &&
-    typeof provider.destination === "string" &&
-    provider.destination.trim() &&
     hasPreview(action) &&
-    model.accessPhrase &&
-    model.authorizationConfigured !== false &&
     !model.checking &&
     !model.sending &&
     !model.attempts.has(action),
@@ -107,7 +98,7 @@ function renderConnections() {
       `${action}-destination`,
       typeof provider?.destination === "string" && provider.destination
         ? provider.destination
-        : "No destination returned by the server.",
+        : "The server will check the configured destination when you try this action.",
     );
     if (!model.attempts.has(action)) {
       const ready = provider?.configured === true;
@@ -121,19 +112,14 @@ function renderConnections() {
           ? provider.detail
           : ready
             ? "The server reports a configured connection. No action has been requested."
-            : "This integration is unavailable until its server configuration is completed.";
-      if (ready && !hasPreview(action))
+            : "Try this action to see which server settings are missing.";
+      if (!ready)
+        detail +=
+          " You can review and try it; the server will report any missing settings.";
+      if (!hasPreview(action))
         detail += " The exact server preview is missing; sending is disabled.";
-      if (
-        ready &&
-        (!provider.destination || typeof provider.destination !== "string")
-      )
-        detail += " The destination is missing; sending is disabled.";
       if (model.authorizationConfigured === false)
         detail += " Lab access is not configured on the server.";
-      if (!model.enabled)
-        detail +=
-          " Real actions are disabled on this server (LAB_PREFLIGHT_ENABLED).";
       setText(`${action}-detail`, detail);
     }
     $(`${action}-preview`).hidden = !hasPreview(action);
@@ -173,7 +159,6 @@ async function checkServices() {
     const data = await response.json();
     if (!data || typeof data.providers !== "object" || !data.providers)
       throw new Error("Configuration response was incomplete.");
-    model.enabled = data.enabled === true;
     model.authenticated =
       data.authenticated === true && phraseAtCheck === model.accessPhrase;
     model.providers = data.providers;
@@ -184,11 +169,10 @@ async function checkServices() {
     ).length;
     setText(
       "service-status",
-      `${ready} of ${ACTIONS.length} real integrations configured. Checking did not perform any action.${!model.enabled ? " Real actions are disabled on this server (LAB_PREFLIGHT_ENABLED)." : ""}${model.authorizationConfigured === false ? " The server also needs its lab access phrase configured." : model.authenticated ? " Access verified. Review a configured action before sending." : " Enter the correct lab access phrase, then check connections again to reveal and verify the exact destinations."}`,
+      `${ready} of ${ACTIONS.length} real integrations configured. Choose an action to review and try it; the server reports any missing settings.${model.authenticated ? " Access verified; exact destinations are shown." : " Configured services require the lab access phrase before an external action can run."} This check created nothing.`,
     );
     renderConnections();
   } catch {
-    model.enabled = false;
     model.authenticated = false;
     model.providers = {};
     model.previews = {};
@@ -270,12 +254,20 @@ function updateDraft() {
   }
 }
 
-function openReview(action) {
+async function openReview(action) {
   if (!ACTIONS.includes(action) || !canReview(action)) return;
+  // A supplied phrase reveals the exact destination before confirmation, without writing.
+  if (model.accessPhrase && !model.authenticated) {
+    await checkServices();
+    if (!canReview(action)) return;
+  }
   model.pending = {
     action,
     preview: { ...model.previews[action] },
-    destination: model.providers[action].destination,
+    destination:
+      typeof model.providers[action]?.destination === "string"
+        ? model.providers[action].destination
+        : "The server will check the configured destination when you try this action.",
   };
   setText("confirm-title", `Review ${LABELS[action].toLowerCase()}`);
   setText(
@@ -445,6 +437,18 @@ function renderResult(action, result, requestId) {
       "A verified provider record is not proof that a person received or read the email. Check your own inbox.",
       "result-warning",
     );
+  if (Array.isArray(result.missing)) {
+    const missing = result.missing.filter(
+      (name) => typeof name === "string" && /^[A-Z][A-Z0-9_]{1,80}$/.test(name),
+    );
+    if (missing.length)
+      appendText(
+        container,
+        "p",
+        `Missing server settings: ${missing.join(", ")}.`,
+        "result-warning",
+      );
+  }
   const facts = document.createElement("dl");
   facts.className = "result-facts";
   resultFact(facts, "Request ID", requestId);
@@ -491,7 +495,10 @@ function renderResult(action, result, requestId) {
   }
   setText(
     `${action}-detail`,
-    "An action was requested. Keep the request ID and inspect the result before taking another step.",
+    !model.attempts.has(action) &&
+      (state === "not_configured" || state === "rejected")
+      ? "No external action was performed. Correct the reported settings or access phrase, then try again."
+      : "An action was requested. Keep the request ID and inspect the result before taking another step.",
   );
 }
 
@@ -595,7 +602,7 @@ async function performAction(event) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${accessPhrase}`,
+        ...(accessPhrase ? { Authorization: `Bearer ${accessPhrase}` } : {}),
       },
       credentials: "same-origin",
       cache: "no-store",
@@ -619,7 +626,8 @@ async function performAction(event) {
         message:
           "The response did not match this request ID. No outcome can be verified here. Inspect the provider before doing anything else.",
       };
-    // Authentication failures occur before the action; allow a deliberate retry after correction.
+    // Only explicit pre-action auth/configuration errors unlock a deliberate retry.
+    // A provider rejection may have left partial effects, so it stays locked.
     if (
       (response.status === 401 && result.state === "rejected") ||
       (response.status === 503 && result.state === "not_configured")
@@ -648,7 +656,7 @@ $("lab-access").addEventListener("input", () => {
   renderSavedReview();
   setText(
     "service-status",
-    "Access phrase changed. Check configured services again to verify access and reveal the exact destinations. No action has been sent by changing this field.",
+    "Access phrase updated. Open an action to review its destination, or refresh configured services. Changing this field sends no action.",
   );
   updateButtons();
 });
@@ -689,3 +697,4 @@ setText("draft-body", DRAFT.body);
 restoreAttempts();
 updateDraft();
 updateButtons();
+checkServices();
