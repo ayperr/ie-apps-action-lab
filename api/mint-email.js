@@ -4,6 +4,7 @@ const service=createMintEmailService();
 export default async function handler(req,res){
   const reply=(status,body)=>{res.statusCode=status;res.end(JSON.stringify(body));};
   res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');
+  res.setHeader('X-Mint-Email-Version','1.1.0');
   try{
     if(req.method==='GET'){const r=service.status(req.headers.authorization);return reply(r.status,r.body);}
     if(req.method!=='POST'){res.setHeader('Allow','GET, POST');return reply(405,{state:'rejected',message:'Use GET or POST.'});}
