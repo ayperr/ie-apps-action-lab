@@ -1,15 +1,11 @@
 {
-  "name": "ie-apps-action-lab",
+  "name": "mint-revenue-lab",
   "version": "1.0.0",
-  "private": false,
-  "description": "A dependency-free teaching starter for turning a dashboard into an action app.",
+  "private": true,
   "type": "module",
-  "license": "MIT",
-  "engines": { "node": ">=22" },
   "scripts": {
-    "dev": "node scripts/server.mjs",
-    "start": "node scripts/server.mjs",
-    "build": "node scripts/build.mjs",
-    "test": "node --test tests/*.test.mjs reference/*.test.mjs"
+    "generate": "node scripts/generate-data.mjs",
+    "start": "node scripts/serve.mjs",
+    "test": "node --test tests/*.test.mjs reference/resend-email.test.mjs"
   }
 }

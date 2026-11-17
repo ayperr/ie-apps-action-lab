@@ -1,0 +1,26 @@
+{
+  "reference": "https://www.jetblue.com/",
+  "purpose": "User-requested JetBlue visual styling for a synthetic classroom analytics prototype",
+  "assets": [
+    {
+      "file": "jetblue-logo.svg",
+      "source": "https://cms.jetblue.com/dam/ui-assets/imagery/logos/updated/JetBlue-logo.svg",
+      "bytes": 3065
+    },
+    {
+      "file": "klarheit-book.woff2",
+      "source": "https://www.jetblue.com/_next/static/media/klarheit_book-s.p.1z9wo9ek37nai.woff2",
+      "bytes": 41576
+    },
+    {
+      "file": "klarheit-semi.woff2",
+      "source": "https://www.jetblue.com/_next/static/media/klarheit_semi-s.p.0z5-d3fztessw.woff2",
+      "bytes": 41124
+    },
+    {
+      "file": "klarheit-xbold.woff2",
+      "source": "https://www.jetblue.com/_next/static/media/klarheit_xbold-s.p.3t_ot21cq678w.woff2",
+      "bytes": 40312
+    }
+  ]
+}

@@ -1,11 +1,4 @@
+.env.local
 node_modules/
-.vercel/
-.env*
-!.env.example
-.local/
-*.log
-coverage/
 test-results/
-playwright-report/
-preflight-result*.json
-.DS_Store
+.vercel/

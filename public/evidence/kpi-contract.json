@@ -1,0 +1,83 @@
+{
+  "version": "1.0.0",
+  "synthetic": true,
+  "default_as_of": "2026-11-10",
+  "global_supported_as_of": [
+    "2026-10-12",
+    "2026-11-10"
+  ],
+  "kpis": [
+    {
+      "id": "K1",
+      "name": "Mint booked revenue",
+      "meaning": "Generated Mint ticket revenue booked by the selected as-of date.",
+      "formula": "SUM(fact_booking.fare) WHERE bookingDate <= t",
+      "unit": "USD",
+      "aggregation": "Add fares across distinct booking IDs; never add successive cumulative as-of totals.",
+      "time_basis": "Cumulative through end-of-day t, for selected departures.",
+      "eligibility": "Mint bookings belonging to the selected route/departure cohort; apply selected booking channel.",
+      "missing_zero": "Missing IDs, dates or fares fail validation. Valid cohort with no bookings = 0 USD. Empty departure cohort = N/A.",
+      "filters": "Route + departure date + departure ID + booking channel. As-of t is a cutoff, not a booking-date equality filter.",
+      "non_additive": "Do not add cumulative revenue across as-of dates or add it again to snapshot revenue."
+    },
+    {
+      "id": "K2",
+      "name": "Average booked Mint fare",
+      "meaning": "Average generated fare per booked Mint passenger.",
+      "formula": "K1 / COUNT(fact_booking.id), using identical booking filters",
+      "unit": "USD per booked passenger",
+      "aggregation": "Divide total fare by total booking count. Do not average route or flight averages.",
+      "time_basis": "Bookings made on or before end-of-day t.",
+      "eligibility": "Exactly the same booking rows as K1; one booking represents one passenger.",
+      "missing_zero": "Missing required fields fail validation; zero bookings or empty departure cohort = N/A.",
+      "filters": "Route + departure date + departure ID + booking channel.",
+      "non_additive": "Averages cannot be summed. Recompute from numerator and denominator for each group."
+    },
+    {
+      "id": "K3",
+      "name": "Booked Mint seat utilization",
+      "meaning": "Share of modeled Mint capacity already booked; this is not final flown load factor.",
+      "formula": "100 \u00d7 SUM(fact_snapshot.booked at t) / SUM(fact_inventory.mintCapacity once per departure)",
+      "unit": "Percent",
+      "aggregation": "Ratio of total booked seats to total capacity. One snapshot at t and one inventory row per departure.",
+      "time_basis": "End-of-day t; capacity is assumed constant over the generated history.",
+      "eligibility": "Selected route/departure cohort with a complete snapshot at t. Always all booking channels.",
+      "missing_zero": "Missing snapshots or invalid counts = N/A with an error; zero capacity or empty cohort = N/A. No silent row drops.",
+      "filters": "Route + departure date + departure ID + snapshot t. Booking-channel filter does not apply; label ALL CHANNELS.",
+      "non_additive": "Do not sum percentages or take a simple average of flight percentages."
+    },
+    {
+      "id": "K4",
+      "name": "Remaining Mint seats",
+      "meaning": "Modeled Mint seats not yet booked at the selected as-of date.",
+      "formula": "SUM(fact_inventory.mintCapacity once per departure) \u2212 SUM(fact_snapshot.booked at t)",
+      "unit": "Seats",
+      "aggregation": "Add across distinct departures at the same t. Never sum across snapshot dates.",
+      "time_basis": "End-of-day t.",
+      "eligibility": "Same selected departures and snapshot-completeness rules as K3. Always all booking channels.",
+      "missing_zero": "Missing snapshots or negative remaining inventory = error/N/A; valid sold-out cohort = 0 seats; empty cohort = N/A.",
+      "filters": "Route + departure date + departure ID + snapshot t. Booking-channel filter does not apply; label ALL CHANNELS.",
+      "non_additive": "Point-in-time inventory is not additive over time."
+    },
+    {
+      "id": "K5",
+      "name": "7-day booking pickup",
+      "meaning": "Additional generated Mint passenger bookings during the seven calendar days ending at t.",
+      "formula": "COUNT(fact_booking.id) WHERE t \u2212 7 days < bookingDate <= t",
+      "unit": "Passengers booked in 7 days",
+      "aggregation": "Add distinct booking rows across selected departures/channels within this one window.",
+      "time_basis": "Seven daily dates: t\u22126 through t, inclusive. Compare with the preceding non-overlapping window when coverage permits.",
+      "eligibility": "Selected route/departure cohort and booking channel; the generated model has no cancellations/refunds.",
+      "missing_zero": "Missing booking IDs/dates fail validation. Valid complete window with no bookings = 0; incomplete coverage or empty cohort = N/A.",
+      "filters": "Route + departure date + departure ID + booking channel. t controls the rolling window.",
+      "non_additive": "Overlapping rolling 7-day windows must not be summed. This is gross pickup; cancellations are excluded."
+    }
+  ],
+  "status": "validated and frozen for dashboard foundation",
+  "source_sha256": "d6ea54052f97ea6a24a974baebd3ee59baf73567e37040619e7225ac530401bf",
+  "validation": {
+    "kpi_comparisons": 25,
+    "mismatches": 0,
+    "dimension_relationships_checked": 8
+  }
+}
