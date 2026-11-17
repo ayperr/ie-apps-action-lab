@@ -1,6 +1,6 @@
 # Northstar · Action Lab
 
-A working dashboard with actions in context: **Overview → Segment → Record**. Email the current view, turn a segment into a Trello task, correct a real numeric value in Supabase, and report its source problem as a GitHub **issue**.
+A working dashboard with actions in context: **Overview → Segment → Record**. Click a KPI to share a finding by email, click a chart bar to assign an investigation in Trello, edit a record’s numeric cell to save a correction in Supabase, and report a source problem from that record as a GitHub **issue**.
 
 The four integrations, editable messages, previews, confirmation and verification are implemented. Copy the app, personalize it, connect your own accounts and check the results. You do not build four APIs from scratch or move to a separate action panel.
 
@@ -17,7 +17,7 @@ The four integrations, editable messages, previews, confirmation and verificatio
 
 A starting prompt:
 
-> Personalize this working dashboard for my case. Keep Overview, Segment and Record connected. Email must use the current view, Trello the selected segment, and Supabase/GitHub the selected record. Preserve editable messages, explicit confirmation and verification. If we use another dataset, update the interface, server source/context and Supabase seed/allowed records together. Do not change labels while sending the old data. Keep credentials in server settings and show me what you tested.
+> Personalize this working dashboard for my case. Keep Overview, Segment and Record connected. Attach Share finding to the selected KPI, Assign investigation to the selected chart bar, numeric editing to the record cell, and Report data issue to the record or audit context. Preserve the selected metric, filters, segment and record in each action. Preserve editable messages, explicit confirmation and verification. If we use another dataset, update the interface, server source/context and Supabase seed/allowed records together. Do not change labels while sending the old data. Keep credentials in server settings and show me what you tested.
 
 The included 24 fictional orders make a complete fallback. **NS-1041** has revenue $1,200 and cost $1,320. Its audit note identifies a duplicate $240 freight charge: correcting cost to **$1,080** changes contribution from **−$120 to +$120**. This is a real numeric correction, not a reviewed-status toggle.
 
@@ -25,10 +25,10 @@ The included 24 fictional orders make a complete fallback. **NS-1041** has reven
 
 | Level and action | Time | What you do | Evidence |
 | --- | --- | --- | --- |
-| 1 · Overview / Email | 30 min | Set the view, click **Email this view**, edit recipient, subject and message, review and confirm. | Current filters/summary in the email and the actual message in your inbox. |
-| 2 · Segment / Trello | 30 min | Click a region/category or investigate a segment. Choose **Create a Trello task**, edit title/description and confirm. | A real card with the selected segment, records and requested next step. |
-| 3 · Record / Supabase | 35 min | Open NS-1041 **Details →**, inspect its audit note, choose **Edit values in Supabase** and correct cost 1320 → 1080 with a reason. | Value saved in the database, contribution recalculated to +120, and the same value after reload/refresh. |
-| 4 · Record / GitHub issue | 30 min | Choose **Report source issue in GitHub**; edit the title/body explaining the duplicate charge and requested import fix. | A real issue containing the record and evidence. Opening it changes no source data. |
+| 1 · Overview / Email | 30 min | Click a KPI, choose **Share finding**, edit recipient, subject and message, then review and confirm. | Selected KPI and current filters in the email, plus the actual message in your inbox. |
+| 2 · Segment / Trello | 30 min | Click a region/category bar. Choose **Assign investigation** for that bar, edit title/description and confirm. | A real card with the selected segment, records and requested next step. |
+| 3 · Record / Supabase | 35 min | Open NS-1041 **Details →**, inspect its audit note and edit the **Product cost** numeric cell inline: 1320 → 1080, with a reason. Review and confirm the save. | Value saved in the database, contribution recalculated to +120, and the same value after reload/refresh. |
+| 4 · Record / GitHub issue | 30 min | From the record row or audit context, choose **Report data issue**; edit the title/body explaining the duplicate charge and requested import fix. | A real issue containing the record and evidence. Opening it changes no source data. |
 
 Initial work 35 min + exercises 125 min + break 10 min + close 10 min = **180 minutes**. An email/Teams draft may be used as an optional warm-up; it is not evidence of sending. There is no PR/branch/merge exercise in this flow.
 
@@ -55,7 +55,9 @@ The function writes one field and reads it back independently. The dashboard the
 
 ## Verification status
 
-**All four contextual actions passed live checks on 17 November 2026** in the published dashboard ([tested commit](https://github.com/josncmar/ie-apps-action-lab/commit/fef782e984cfb9e907b00e9c488de9dfcabede36)).
+The revised KPI, chart-bar and inline-cell entry points are being checked separately. The evidence below proves the service integrations; it is not a claim that new real actions have been executed through the revised controls.
+
+**All four integrations passed live checks on 17 November 2026** in the earlier published dashboard ([tested commit](https://github.com/josncmar/ie-apps-action-lab/commit/fef782e984cfb9e907b00e9c488de9dfcabede36)).
 
 | Action | Observed evidence |
 | --- | --- |

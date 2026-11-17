@@ -1,6 +1,6 @@
 # Guía de conexiones · dashboard integrado
 
-Las cuatro acciones ya están implementadas y se utilizan dentro del dashboard principal: **Overview → Segment → Record**. No hay que construir cuatro APIs ni abrir un panel separado. El alumno copia, despliega, personaliza el caso y conecta sus cuentas.
+Las cuatro acciones ya están implementadas y parten del elemento que estás analizando en **Overview → Segment → Record**: un KPI, una barra, una celda numérica o la evidencia de un registro. No hay que construir cuatro APIs ni abrir un panel separado. El alumno copia, despliega, personaliza el caso y conecta sus cuentas.
 
 ## Recorrido de la clase · 180 minutos
 
@@ -26,7 +26,7 @@ Consulta tu plan y cuotas antes del taller. Las cuentas utilizadas no se han aud
 
 ## 1 · Overview: enviar el resumen de la vista por email
 
-**En la app:** ajusta la vista y sus filtros, pulsa **Email this view** y edita **destinatario, asunto y mensaje**. Revisa el contexto y la vista previa exacta antes de confirmar.
+**En la app:** ajusta los filtros y pulsa el **KPI** que quieres comentar. En su contexto, elige **Share finding** y edita **destinatario, asunto y mensaje**. Conserva el indicador seleccionado y los filtros, revisa el email exacto y confirma.
 
 1. En [Resend → API Keys](https://resend.com/api-keys), crea una clave de prácticas con **Full access**: permite enviar y consultar después el resultado.
 2. Configura `LAB_EMAIL_TO` con la dirección asociada a tu propia cuenta Resend. El remitente incluido es `onboarding@resend.dev`.
@@ -43,7 +43,7 @@ El destinatario es editable, pero la ruta de prueba actual solo autoriza la dire
 
 ## 2 · Segment: convertir el diagnóstico en una tarea Trello
 
-**En la app:** selecciona una región/categoría en los gráficos o usa **Investigate this segment**. En el segmento, pulsa **Create a Trello task** y edita título y descripción. La tarea debe conservar el segmento, sus registros y el siguiente paso solicitado.
+**En la app:** pulsa la **barra** de la región o categoría que quieres investigar. En el contexto de esa barra, elige **Assign investigation** y edita título y descripción. La tarea debe conservar el segmento seleccionado, sus registros y el siguiente paso solicitado.
 
 1. Crea un tablero y una lista de prácticas propios.
 2. En [trello.com/apps/admin](https://trello.com/apps/admin), crea una app con **My app doesn't use Power-up capabilities**. Completa nombre, Workspace y emails.
@@ -85,7 +85,7 @@ Petición útil para el asistente:
 
 ### Ejercicio y comprobación
 
-En el registro, pulsa **Edit values in Supabase**. Elige **Product cost**, introduce **1080** y explica el transporte duplicado. Puedes corregir revenue, cost o refund; la cifra debe ser válida, no negativa, y el reembolso no puede superar los ingresos. Revisa el antes/después, confirma y observa cómo cambia la contribución.
+En el detalle del registro, pulsa la **celda numérica Product cost** y edita su valor directamente: introduce **1080** y explica el transporte duplicado. Puedes corregir revenue, cost o refund; la cifra debe ser válida, no negativa, y el reembolso no puede superar los ingresos. Revisa el antes/después, confirma y observa cómo cambia la contribución.
 
 El servidor compara **valor anterior y revisión**. Si otra persona cambió el registro mientras lo revisabas, devuelve un conflicto y no pisa el cambio: refresca y vuelve a revisar. Después de escribir, consulta la base de datos de nuevo antes de confirmar el éxito.
 
@@ -95,7 +95,7 @@ Esta función y tabla son nuevas. Los antiguos `setup.sql`, `writeback/index.ts`
 
 ## 4 · Record: reportar el problema mediante un issue de GitHub
 
-**En la app:** con el registro abierto, pulsa **Report source issue in GitHub**. Edita título y descripción para explicar el cargo duplicado, la cifra anterior/corregida y qué debe revisar el proceso de importación. Se abre un **issue**, no una PR: no se crean ramas, commits ni se modifica código.
+**En la app:** desde la fila del registro o su contexto de auditoría, elige **Report data issue**. Edita título y descripción para explicar el cargo duplicado, la cifra anterior/corregida y qué debe revisar el proceso de importación. Se abre un **issue**, no una PR: no se crean ramas, commits ni se modifica código.
 
 1. Usa tu propia copia del repositorio. Abre [crear token de prácticas](https://github.com/settings/personal-access-tokens/new?name=IE%20Action%20Lab&expires_in=7&issues=write).
 2. Elige tu cuenta como **Resource owner**. En **Repository access**, marca **Only select repositories** y selecciona tu copia, aunque sea pública. **Public repositories** es solo lectura.
@@ -111,7 +111,9 @@ Esta función y tabla son nuevas. Los antiguos `setup.sql`, `writeback/index.ts`
 
 ## Evidencia y cierre
 
-**Las cuatro acciones del nuevo dashboard integrado pasaron pruebas reales el 17 de noviembre de 2026**, sobre el commit publicado `fef782e984cfb9e907b00e9c488de9dfcabede36`.
+La interacción revisada desde el KPI, la barra y la celda se está comprobando por separado. Las pruebas siguientes demuestran las integraciones; no acreditan nuevas ejecuciones reales mediante los controles revisados.
+
+**Las cuatro integraciones pasaron pruebas reales el 17 de noviembre de 2026**, sobre el despliegue anterior del commit `fef782e984cfb9e907b00e9c488de9dfcabede36`.
 
 | Acción | Evidencia observada |
 | --- | --- |

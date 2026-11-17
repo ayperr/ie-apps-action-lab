@@ -63,7 +63,10 @@
     },
     accessPhrase: "",
     history: [],
+    historyExpanded: false,
     pending: null,
+    menu: null,
+    inlineEdit: null,
     submitting: false,
     refreshing: false,
     storageAvailable: true,
@@ -151,8 +154,16 @@
     if (scope.search) parts.push(`Search: ${scope.search}`);
     return parts.join(" · ") || "All orders";
   }
-  function visibleOrders() {
-    const f = state.filters;
+  function ordersForScope(scope) {
+    const f = {
+      search: "",
+      signal: "all",
+      status: "all",
+      region: "",
+      category: "",
+      channel: "",
+      ...scope,
+    };
     return state.orders.filter((order) => {
       const search = [
         order.id,
@@ -179,6 +190,152 @@
         (!f.channel || order.channel === f.channel)
       );
     });
+  }
+  function visibleOrders() {
+    return ordersForScope(currentScope());
+  }
+  function freezeSelection(selection) {
+    return Object.freeze({
+      ...selection,
+      scope: Object.freeze({ ...selection.scope }),
+    });
+  }
+  function recordSelection(order, field) {
+    return freezeSelection({
+      kind: field ? "cell" : "record",
+      label: field
+        ? `${order.id} · ${field}`
+        : `${order.id} · ${order.product}`,
+      scope: { search: order.id },
+      recordId: order.id,
+      field,
+    });
+  }
+  function metricValue(metric, totals) {
+    if (["count", "attention"].includes(metric))
+      return `${totals[metric]} orders`;
+    return exactMoney.format(totals[metric]);
+  }
+  function selectionSummary(selection, totals) {
+    return `${selection.label}${selection.metric ? ` · ${metricValue(selection.metric, totals)}` : ""}`;
+  }
+  function closeContext(returnFocus = true) {
+    const trigger = state.menu?.trigger;
+    state.menu = null;
+    $("#context-menu").hidden = true;
+    trigger?.setAttribute("aria-expanded", "false");
+    if (returnFocus && trigger?.isConnected)
+      trigger.focus({ preventScroll: true });
+  }
+  function openContext(selection, trigger, point) {
+    if (state.pending || state.submitting) return;
+    closeContext(false);
+    const menu = $("#context-menu"),
+      frozen = freezeSelection(selection);
+    const totals = metrics(ordersForScope(frozen.scope));
+    state.menu = { selection: frozen, trigger };
+    trigger?.setAttribute("aria-expanded", "true");
+    menu.replaceChildren();
+    const heading = node(
+      "div",
+      "context-menu-heading",
+      selectionSummary(frozen, totals),
+    );
+    heading.id = "context-selection-title";
+    menu.setAttribute("aria-labelledby", heading.id);
+    menu.append(
+      heading,
+      node(
+        "p",
+        "context-menu-meta",
+        `${totals.count} records · ${scopeLabel(frozen.scope)}`,
+      ),
+    );
+    const options = frozen.recordId
+      ? [
+          ["details", "Inspect record", "Source values and audit"],
+          ["email", "Share finding", "Email · editable message"],
+          ["github", "Report data issue", "GitHub · source follow-up"],
+        ]
+      : [
+          ["explore", "Explore segment", "Open the records behind this value"],
+          ["email", "Share finding", "Email · editable message"],
+          [
+            "trello",
+            "Assign investigation",
+            "Trello · a task for this selection",
+          ],
+        ];
+    for (const [action, label, hint] of options) {
+      const button = node("button", "context-option");
+      button.type = "button";
+      button.dataset.contextAction = action;
+      button.setAttribute("role", "menuitem");
+      button.append(node("strong", "", label), node("span", "", hint));
+      button.addEventListener("click", () => {
+        const origin = state.menu?.trigger;
+        closeContext(false);
+        if (action === "explore") {
+          state.filters = {
+            search: "",
+            signal: "all",
+            status: "all",
+            region: "",
+            category: "",
+            channel: "",
+            ...frozen.scope,
+          };
+          state.level = "segment";
+          state.selectedId = null;
+          syncFilters();
+          render();
+          focusView();
+        } else if (action === "details") selectOrder(frozen.recordId);
+        else openAction(action, "cost", { ...frozen, returnFocus: origin });
+      });
+      menu.append(button);
+    }
+    const dismiss = node("button", "context-dismiss", "Close");
+    dismiss.type = "button";
+    dismiss.setAttribute("role", "menuitem");
+    dismiss.addEventListener("click", () => closeContext());
+    menu.append(dismiss);
+    menu.hidden = false;
+    const rect = trigger?.getBoundingClientRect() || { left: 16, bottom: 16 };
+    const width = menu.offsetWidth,
+      height = menu.offsetHeight;
+    menu.style.left = `${Math.max(12, Math.min(point?.x ?? rect.left, window.innerWidth - width - 12))}px`;
+    menu.style.top = `${Math.max(12, Math.min(point?.y ?? rect.bottom + 8, window.innerHeight - height - 12))}px`;
+    menu.querySelector("button")?.focus({ preventScroll: true });
+  }
+  function bindContextTrigger(trigger, getSelection) {
+    trigger.setAttribute("aria-haspopup", "menu");
+    trigger.setAttribute("aria-expanded", "false");
+    trigger.addEventListener("click", () =>
+      openContext(getSelection(), trigger),
+    );
+    trigger.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      openContext(getSelection(), trigger, {
+        x: event.clientX,
+        y: event.clientY,
+      });
+    });
+  }
+  function decorateDraft(draft, selection, totals, action) {
+    if (!selection.metric) return draft;
+    const finding = selectionSummary(selection, totals);
+    const result = { ...draft };
+    const titleKey = action === "email" ? "subject" : "title";
+    const bodyKey = action === "trello" ? "description" : "body";
+    result[titleKey] =
+      `${action === "trello" ? "Investigate" : "Finding"}: ${finding}`.slice(
+        0,
+        140,
+      );
+    result[bodyKey] =
+      `Selected finding: ${finding}\nScope: ${scopeLabel(selection.scope)}\n\n${result[bodyKey] || ""}`;
+    return result;
   }
   function selectedOrder() {
     return state.orders.find((order) => order.id === state.selectedId);
@@ -386,6 +543,46 @@
   }
   function renderMetrics(orders) {
     const totals = metrics(orders);
+    for (const [selector, metric, label] of [
+      ["#metric-revenue", "netRevenue", "Net revenue"],
+      ["#metric-profit", "profit", "Contribution"],
+      ["#metric-orders", "count", "Orders in view"],
+      ["#metric-attention", "attention", "Orders needing attention"],
+    ]) {
+      const card = $(selector).closest("article");
+      card.classList.add("interactive-metric");
+      card.tabIndex = 0;
+      card.setAttribute("role", "button");
+      card.setAttribute(
+        "aria-label",
+        `${label}: ${metricValue(metric, totals)}. Open actions for this finding.`,
+      );
+      card.setAttribute("aria-haspopup", "menu");
+      const chooseMetric = (point) => {
+        const scope = currentScope();
+        if (metric === "attention") {
+          if (!totals.attention) {
+            notify("No orders need attention in the current filtered view.");
+            return;
+          }
+          // Existing negative/late/refund filters already select a subset of
+          // attention records. Preserve them instead of broadening the view.
+          if (!scope.signal) scope.signal = "attention";
+        }
+        openContext({ kind: "metric", label, metric, scope }, card, point);
+      };
+      card.onclick = () => chooseMetric();
+      card.oncontextmenu = (event) => {
+        event.preventDefault();
+        chooseMetric({ x: event.clientX, y: event.clientY });
+      };
+      card.onkeydown = (event) => {
+        if (["Enter", " "].includes(event.key)) {
+          event.preventDefault();
+          card.click();
+        }
+      };
+    }
     text("#metric-revenue", money.format(totals.netRevenue));
     text("#metric-profit", money.format(totals.profit));
     text("#metric-orders", String(totals.count).padStart(2, "0"));
@@ -393,7 +590,9 @@
     text("#metric-order-note", `${state.orders.length} total · current scope`);
     text(
       "#scope-summary",
-      `${totals.count} ${totals.count === 1 ? "order" : "orders"} · ${scopeLabel()}`,
+      state.level === "record"
+        ? `1 record · ${state.selectedId}`
+        : `${totals.count} ${totals.count === 1 ? "order" : "orders"} · ${scopeLabel()}`,
     );
     const chips = $("#scope-chips");
     chips.replaceChildren();
@@ -430,7 +629,7 @@
         button.dataset.value = value;
         button.setAttribute(
           "aria-label",
-          `Explore ${field} ${value}: ${money.format(total)}`,
+          `Select ${field} ${value}: ${money.format(total)}. Open finding actions.`,
         );
         const track = node("span", "bar-track"),
           fill = node("span", `bar-fill${total < 0 ? " negative" : ""}`);
@@ -442,7 +641,12 @@
           track,
           node("span", "region-value", money.format(total)),
         );
-        button.addEventListener("click", () => drill(field, value));
+        bindContextTrigger(button, () => ({
+          kind: "bar",
+          label: `${measure === "profit" ? "Contribution" : "Net revenue"} · ${value}`,
+          metric: measure === "profit" ? "profit" : "netRevenue",
+          scope: { ...currentScope(), [field]: value },
+        }));
         return button;
       }),
     );
@@ -477,14 +681,12 @@
           node("span", "", signal.label),
           node("strong", "", String(count).padStart(2, "0")),
         );
-        button.addEventListener("click", () => {
-          state.filters.signal = key;
-          state.level = "segment";
-          state.selectedId = null;
-          syncFilters();
-          render();
-          focusView();
-        });
+        bindContextTrigger(button, () => ({
+          kind: "signal",
+          label: signal.label,
+          metric: "count",
+          scope: { ...currentScope(), signal: key },
+        }));
         return button;
       }),
     );
@@ -534,7 +736,12 @@
           `View details and actions for ${order.id}`,
         );
         details.addEventListener("click", () => selectOrder(order.id));
-        detailsCell.append(details);
+        const more = node("button", "row-menu-button", "⋯");
+        more.type = "button";
+        more.dataset.orderId = order.id;
+        more.setAttribute("aria-label", `Open finding actions for ${order.id}`);
+        bindContextTrigger(more, () => recordSelection(order));
+        detailsCell.append(details, more);
         row.append(
           identity,
           node("td", "money-cell", money.format(net(order))),
@@ -550,9 +757,97 @@
           if (!event.target.closest("button,a")) selectOrder(order.id);
         });
         row.addEventListener("dblclick", () => selectOrder(order.id));
+        row.addEventListener("contextmenu", (event) => {
+          event.preventDefault();
+          openContext(recordSelection(order), more, {
+            x: event.clientX,
+            y: event.clientY,
+          });
+        });
         return row;
       }),
     );
+  }
+  function inlineEditor(edit) {
+    const form = node("form", "inline-value-editor");
+    form.append(
+      node(
+        "p",
+        "inline-current-value",
+        `Current ${edit.field}: ${sourceMoney(edit.original[edit.field])} · revision ${edit.original.revision ?? state.revision}`,
+      ),
+    );
+    const valueLabel = node("label", "", "New value · USD"),
+      value = node("input");
+    value.id = "inline-edit-value";
+    value.type = "number";
+    value.min = "0";
+    value.max = "1000000000";
+    value.step = "any";
+    value.required = true;
+    value.value = edit.newValue;
+    valueLabel.append(value);
+    const reasonLabel = node("label", "", "Reason / evidence"),
+      reason = node("textarea");
+    reason.id = "inline-edit-reason";
+    reason.required = true;
+    reason.minLength = 5;
+    reason.maxLength = 600;
+    reason.rows = 2;
+    reason.value = edit.reason;
+    reasonLabel.append(reason);
+    const preview = node("p", "inline-editor-preview");
+    preview.id = "inline-change-preview";
+    preview.setAttribute("aria-live", "polite");
+    function calculate() {
+      edit.newValue = value.value;
+      edit.reason = reason.value;
+      const proposed = Number(value.value);
+      preview.textContent =
+        value.value && Number.isFinite(proposed) && proposed >= 0
+          ? `Contribution ${exactMoney.format(profit(edit.original))} → ${exactMoney.format(profit({ ...edit.original, [edit.field]: proposed }))}. Preview only; not saved.`
+          : "Enter a valid numeric value to preview its effect.";
+    }
+    value.addEventListener("input", calculate);
+    reason.addEventListener("input", calculate);
+    const actions = node("div", "inline-editor-actions"),
+      review = node("button", "button primary small", "Review change →"),
+      cancel = node("button", "button secondary small", "Cancel");
+    review.id = "inline-review-change";
+    review.type = "submit";
+    cancel.type = "button";
+    cancel.addEventListener("click", () => {
+      state.inlineEdit = null;
+      renderDetail();
+      $(`.numeric-value-button[data-field="${edit.field}"]`)?.focus();
+    });
+    actions.append(review, cancel);
+    form.append(valueLabel, reasonLabel, preview, actions);
+    calculate();
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      if (!form.reportValidity()) return;
+      const change = {
+        field: edit.field,
+        newValue: Number(edit.newValue),
+        expectedValue: edit.original[edit.field],
+        expectedRevision: edit.original.revision ?? state.revision,
+        reason: edit.reason.trim(),
+      };
+      if (change.newValue === change.expectedValue) {
+        preview.textContent =
+          "Enter a different value before reviewing a change.";
+        value.focus();
+        return;
+      }
+      openAction(
+        "supabase",
+        edit.field,
+        { ...recordSelection(edit.original, edit.field), returnFocus: value },
+        { change, original: edit.original },
+      );
+    });
+    return form;
   }
   function renderDetail() {
     const detail = $("#order-detail"),
@@ -588,13 +883,15 @@
     const caption = node(
       "caption",
       "sr-only",
-      "Recorded source values and numeric correction actions",
+      "Select a source value to review a numeric correction in its cell",
     );
     const head = node("thead"),
       header = node("tr");
-    ["Source field", "Current value", "Action"].forEach((label) =>
-      header.append(node("th", "", label)),
-    );
+    for (const label of ["Source field", "Current value · select to edit"]) {
+      const th = node("th", "", label);
+      th.scope = "col";
+      header.append(th);
+    }
     head.append(header);
     const body = node("tbody");
     for (const [field, label] of [
@@ -603,39 +900,60 @@
       ["refund", "Refund"],
     ]) {
       const row = node("tr"),
-        control = node("td"),
-        button = node("button", "button secondary small", "Edit value");
-      button.type = "button";
-      button.setAttribute("aria-label", `Edit ${field} for ${order.id}`);
-      button.addEventListener("click", () => openAction("supabase", field));
-      control.append(button);
-      row.append(
-        node("th", "", label),
-        node("td", "money-cell", sourceMoney(order[field])),
-        control,
-      );
+        cell = node("td", "source-value-cell"),
+        th = node("th", "", label);
+      th.scope = "row";
+      const edit = state.inlineEdit;
+      if (edit?.recordId === order.id && edit.field === field) {
+        row.className = "inline-edit-row";
+        cell.append(inlineEditor(edit));
+      } else {
+        const button = node(
+          "button",
+          "numeric-value-button",
+          sourceMoney(order[field]),
+        );
+        button.type = "button";
+        button.dataset.field = field;
+        button.setAttribute(
+          "aria-label",
+          `Edit ${field} for ${order.id}: ${sourceMoney(order[field])}`,
+        );
+        button.append(node("span", "numeric-edit-cue", "Edit ↗"));
+        button.addEventListener("click", () => {
+          state.inlineEdit = {
+            recordId: order.id,
+            field,
+            original: { ...order },
+            newValue: String(order[field]),
+            reason: "",
+          };
+          renderDetail();
+          $("#inline-edit-value").focus();
+          $("#inline-edit-value").select();
+        });
+        cell.append(button);
+      }
+      row.append(th, cell);
       body.append(row);
     }
     values.append(caption, head, body);
-    const note = node("div", "detail-note");
-    note.append(
-      node("strong", "", "Source context / classroom audit"),
-      node("p", "", order.note),
+    const note = node("button", "detail-note source-context-trigger");
+    note.type = "button";
+    note.setAttribute(
+      "aria-label",
+      `Open actions for the source audit of ${order.id}`,
     );
-    const actions = node("div", "context-actions"),
-      edit = node("button", "button primary", "Edit values in Supabase →"),
-      issue = node(
-        "button",
-        "button secondary",
-        "Report source issue in GitHub ↗",
-      );
-    edit.type = "button";
-    edit.id = "edit-record";
-    edit.addEventListener("click", () => openAction("supabase"));
-    issue.type = "button";
-    issue.id = "github-record";
-    issue.addEventListener("click", () => openAction("github"));
-    actions.append(edit, issue);
+    note.append(
+      node("strong", "", "Source context / classroom audit ⋯"),
+      node("span", "source-audit-text", order.note),
+      node(
+        "span",
+        "source-context-hint",
+        "Select this evidence to share or report a data issue",
+      ),
+    );
+    bindContextTrigger(note, () => recordSelection(order));
     detail.append(
       top,
       heading,
@@ -644,11 +962,10 @@
       context,
       values,
       note,
-      actions,
       node(
         "p",
         "detail-footnote",
-        "Saving changes a numeric source value. A GitHub issue records a follow-up; it does not change the data.",
+        "Select a number to correct its source value. Select the audit evidence to report the underlying data issue.",
       ),
     );
     if (!visibleOrders().some((item) => item.id === order.id))
@@ -661,7 +978,9 @@
       );
   }
   function render() {
+    closeContext(false);
     const orders = visibleOrders();
+    $("#main").dataset.level = state.level;
     text(
       "#view-level",
       state.level === "overview"
@@ -676,17 +995,16 @@
         ? "Operations overview"
         : state.level === "segment"
           ? scopeLabel()
-          : `${state.selectedId} · record investigation`,
+          : "Order detail",
     );
     text("#snapshot-date", dateLabel(state.asOf));
     $("#snapshot-date").dateTime = state.asOf;
     $("#overview-view").hidden = state.level !== "overview";
     $("#segment-view").hidden = state.level !== "segment";
     $("#metrics").hidden = state.level !== "overview";
-    $("#workspace").hidden = state.level === "overview";
-    $("#orders-panel").hidden = state.level !== "segment";
+    $("#workspace").hidden = false;
+    $("#orders-panel").hidden = state.level === "record";
     $("#global-filters").hidden = state.level === "record";
-    $("#email-view").hidden = state.level !== "overview";
     text(
       "#download-csv",
       state.level === "record"
@@ -702,12 +1020,31 @@
     const totals = metrics(orders);
     text(
       "#segment-description",
-      `${totals.count} records · ${money.format(totals.netRevenue)} net revenue · ${money.format(totals.profit)} contribution. Open a record to inspect the source, or create a task carrying this scope.`,
+      `${totals.count} records · ${money.format(totals.netRevenue)} net revenue · ${money.format(totals.profit)} contribution. Select a bar or a row’s ⋯ menu to act on that exact finding. Open a record to inspect its source values.`,
     );
     renderBreadcrumbs();
     renderMetrics(orders);
     renderCharts(orders);
-    renderOrders(orders);
+    const priority = orders.filter((order) => signals(order).length);
+    const tableOrders =
+      state.level === "overview"
+        ? (priority.length ? priority : orders).slice(0, 6)
+        : orders;
+    text(
+      "#orders-title",
+      state.level === "overview"
+        ? priority.length
+          ? "Priority review"
+          : "Orders in view"
+        : "Segment records",
+    );
+    text(
+      "#table-scope-note",
+      state.level === "overview"
+        ? `${tableOrders.length} shown · ${orders.length} orders in this view · Open Segments for the full list`
+        : `${orders.length} matching synthetic orders · No customer data`,
+    );
+    renderOrders(tableOrders);
     renderDetail();
   }
   function syncFilters() {
@@ -728,14 +1065,8 @@
     render();
     focusView();
   }
-  function drill(field, value) {
-    state.filters[field] = value;
-    state.level = "segment";
-    state.selectedId = null;
-    render();
-    focusView();
-  }
   function selectOrder(id) {
+    state.inlineEdit = null;
     state.selectedId = id;
     state.level = "record";
     render();
@@ -817,6 +1148,20 @@
   }
   function renderHistory() {
     text("#nav-count", state.history.length);
+    text(
+      "#history-summary-count",
+      state.history.length
+        ? `${state.history.length} request${state.history.length === 1 ? "" : "s"} · latest results`
+        : "No actions yet",
+    );
+    $("#history").open = state.history.length > 0;
+    $("#show-history-toggle").hidden = state.history.length <= 2;
+    text(
+      "#show-history-toggle",
+      state.historyExpanded
+        ? "Show latest two"
+        : `Show all ${state.history.length} requests`,
+    );
     $("#export-history").disabled = !state.history.length;
     const list = $("#history-list");
     list.replaceChildren();
@@ -827,98 +1172,100 @@
         node(
           "p",
           "",
-          "No actions yet. Email a filtered view, assign a segment, or open a record to review a correction.",
+          "No actions yet. Select a KPI, chart bar or row to act on that finding. Select a source value to review a correction.",
         ),
       );
       list.append(empty);
       return;
     }
-    state.history.forEach((entry) => {
-      const row = node("article", "activity-row"),
-        copy = node("div");
-      copy.append(
-        node("h3", "activity-title", ACTION_NAMES[entry.action]),
-        node(
-          "p",
-          "activity-meta",
-          `${entry.recordId || scopeLabel(entry.scope)} · ${entry.createdAt}`,
-        ),
-        node(
-          "p",
-          "activity-description",
-          entry.message ||
-            "Keep this request ID and inspect the provider result.",
-        ),
-      );
-      const evidence = node("details", "activity-request");
-      evidence.append(
-        node("summary", "", "Request and evidence"),
-        node("p", "activity-ref", `Request ID: ${entry.requestId}`),
-      );
-      if (entry.providerId !== undefined)
-        evidence.append(
-          node("p", "activity-ref", `Provider ID: ${entry.providerId}`),
-        );
-      if (entry.change)
-        evidence.append(
-          node(
-            "p",
-            "",
-            `${entry.change.field}: ${exactMoney.format(entry.change.expectedValue)} → ${exactMoney.format(entry.change.newValue)} · ${entry.change.reason}`,
-          ),
-        );
-      if (entry.snapshot)
-        evidence.append(
-          node(
-            "p",
-            "activity-ref",
-            `${entry.snapshot.recordIds?.length ?? "—"} records · ${scopeLabel(entry.scope)} · snapshot ${entry.snapshot.fingerprint || "not provided"}`,
-          ),
-        );
-      if (entry.draft)
-        evidence.append(
-          node("pre", "proposal-diff", JSON.stringify(entry.draft, null, 2)),
-        );
-      copy.append(evidence);
-      const href = safeProviderUrl(entry.action, entry.url);
-      if (href) {
-        const link = node("a", "text-link", "Inspect provider result ↗");
-        link.href = href;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        copy.append(link);
-      }
-      if (entry.state === "accepted")
+    (state.historyExpanded ? state.history : state.history.slice(0, 2)).forEach(
+      (entry) => {
+        const row = node("article", "activity-row"),
+          copy = node("div");
         copy.append(
+          node("h3", "activity-title", ACTION_NAMES[entry.action]),
           node(
             "p",
-            "state-banner",
-            "Provider acceptance does not prove inbox delivery. Check the recipient inbox; do not send the same summary again just to check it.",
+            "activity-meta",
+            `${entry.recordId || scopeLabel(entry.scope)} · ${entry.createdAt}`,
           ),
-        );
-      if (["unknown", "rejected"].includes(entry.state) && !entry.retryable)
-        copy.append(
           node(
             "p",
-            "state-banner",
-            "Do not repeat this request. Inspect the provider first; a failed response may follow a partial external action.",
+            "activity-description",
+            entry.message ||
+              "Keep this request ID and inspect the provider result.",
           ),
         );
-      row.append(
-        node(
-          "span",
-          `activity-icon ${entry.state}`,
-          entry.state === "verified"
-            ? "✓"
-            : entry.state === "accepted"
-              ? "↗"
-              : "!",
-        ),
-        copy,
-        node("div", `activity-result ${entry.state}`, RESULTS[entry.state]),
-      );
-      list.append(row);
-    });
+        const evidence = node("details", "activity-request");
+        evidence.append(
+          node("summary", "", "Request and evidence"),
+          node("p", "activity-ref", `Request ID: ${entry.requestId}`),
+        );
+        if (entry.providerId !== undefined)
+          evidence.append(
+            node("p", "activity-ref", `Provider ID: ${entry.providerId}`),
+          );
+        if (entry.change)
+          evidence.append(
+            node(
+              "p",
+              "",
+              `${entry.change.field}: ${exactMoney.format(entry.change.expectedValue)} → ${exactMoney.format(entry.change.newValue)} · ${entry.change.reason}`,
+            ),
+          );
+        if (entry.snapshot)
+          evidence.append(
+            node(
+              "p",
+              "activity-ref",
+              `${entry.snapshot.recordIds?.length ?? "—"} records · ${scopeLabel(entry.scope)} · snapshot ${entry.snapshot.fingerprint || "not provided"}`,
+            ),
+          );
+        if (entry.draft)
+          evidence.append(
+            node("pre", "proposal-diff", JSON.stringify(entry.draft, null, 2)),
+          );
+        copy.append(evidence);
+        const href = safeProviderUrl(entry.action, entry.url);
+        if (href) {
+          const link = node("a", "text-link", "Inspect provider result ↗");
+          link.href = href;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          copy.append(link);
+        }
+        if (entry.state === "accepted")
+          copy.append(
+            node(
+              "p",
+              "state-banner",
+              "Provider acceptance does not prove inbox delivery. Check the recipient inbox; do not send the same summary again just to check it.",
+            ),
+          );
+        if (["unknown", "rejected"].includes(entry.state) && !entry.retryable)
+          copy.append(
+            node(
+              "p",
+              "state-banner",
+              "Do not repeat this request. Inspect the provider first; a failed response may follow a partial external action.",
+            ),
+          );
+        row.append(
+          node(
+            "span",
+            `activity-icon ${entry.state}`,
+            entry.state === "verified"
+              ? "✓"
+              : entry.state === "accepted"
+                ? "↗"
+                : "!",
+          ),
+          copy,
+          node("div", `activity-result ${entry.state}`, RESULTS[entry.state]),
+        );
+        list.append(row);
+      },
+    );
   }
   function exportHistory() {
     const blob = new Blob(
@@ -1002,8 +1349,9 @@
   }
 
   function localDraft(action, scope, order) {
-    const totals = metrics(visibleOrders());
-    const summary = `Synthetic Northstar operations · ${state.asOf}\nScope: ${scopeLabel(scope)}\nOrders: ${totals.count}\nNet revenue: ${exactMoney.format(totals.netRevenue)}\nContribution: ${exactMoney.format(totals.profit)}\nRecords: ${visibleOrders()
+    const scopedOrders = ordersForScope(scope);
+    const totals = metrics(scopedOrders);
+    const summary = `Synthetic Northstar operations · ${state.asOf}\nScope: ${scopeLabel(scope)}\nOrders: ${totals.count}\nNet revenue: ${exactMoney.format(totals.netRevenue)}\nContribution: ${exactMoney.format(totals.profit)}\nRecords: ${scopedOrders
       .map((item) => item.id)
       .join(", ")}`;
     if (action === "email")
@@ -1086,7 +1434,11 @@
     $("#action-fields").hidden = false;
     $("#exact-preview").hidden = true;
     $("#back-to-edit").hidden = true;
-    $("#prepare-action").hidden = false;
+    $("#prepare-action").hidden = Boolean(state.pending?.inlineChange);
+    if (state.pending?.inlineChange) {
+      $("#back-to-edit").hidden = false;
+      text("#back-to-edit", "Return to cell");
+    }
     $("#confirm-action").hidden = true;
     $("#confirm-consent").checked = false;
     if (state.pending) {
@@ -1094,24 +1446,30 @@
       state.pending.snapshot = null;
     }
   }
-  async function openAction(action, field = "cost") {
+  async function openAction(action, field = "cost", selection, inline) {
     if (
       state.submitting ||
       state.pending ||
       !Object.hasOwn(ACTION_NAMES, action)
     )
       return;
-    const order = selectedOrder();
+    if (!selection) return;
+    const order = selection.recordId
+      ? state.orders.find((item) => item.id === selection.recordId)
+      : null;
     if (["supabase", "github"].includes(action) && !order) {
       notify("Open a record before taking this action.");
       return;
     }
-    const scope = currentScope();
+    const scope = Object.freeze({ ...selection.scope });
     const pending = {
       action,
       scope,
-      recordId: ["supabase", "github"].includes(action) ? order.id : undefined,
-      original: order ? { ...order } : null,
+      selection: freezeSelection(selection),
+      returnFocus: selection.returnFocus,
+      recordId: selection.recordId,
+      original: inline ? { ...inline.original } : order ? { ...order } : null,
+      inlineChange: inline?.change,
       dirty: false,
       preparing: false,
       reviewed: null,
@@ -1124,10 +1482,10 @@
     text(
       "#dialog-title",
       {
-        email: "Email the current view",
-        trello: "Assign this segment in Trello",
-        supabase: `Correct ${order?.id} source values`,
-        github: `Report ${order?.id} in GitHub`,
+        email: "Share this finding",
+        trello: "Assign this investigation",
+        supabase: `Review ${order?.id} · ${field}`,
+        github: "Report this data issue",
       }[action],
     );
     text(
@@ -1138,18 +1496,19 @@
         trello:
           "Edit the task title and description. The selected segment and record IDs stay attached to the reviewed task.",
         supabase:
-          "Choose one source value to correct. Review the old value, new value and contribution before a real database write. Only a verified read-back updates the dashboard.",
+          "Review the change entered in the source cell. Check the old value, new value and reason before saving. Only a verified read-back updates the dashboard.",
         github:
           "Edit an issue for this source record. Include the audit evidence and the follow-up that prevents the import error from recurring. An issue does not change source values.",
       }[action],
     );
     text(
       "#review-context",
-      `${pending.recordId ? `${pending.recordId} · ` : ""}${scopeLabel(scope)} · ${visibleOrders().length} records in scope`,
+      `${selectionSummary(selection, metrics(ordersForScope(scope)))} · ${scopeLabel(scope)} · ${ordersForScope(scope).length} records in scope`,
     );
     $("#recipient-field").hidden = action !== "email";
     $("#action-recipient").disabled = action !== "email";
     $("#action-recipient").required = action === "email";
+    $("#reason-field").hidden = Boolean(inline);
     $("#title-field").hidden = numeric;
     $("#action-title").disabled = numeric;
     $("#action-title").required = !numeric;
@@ -1164,13 +1523,22 @@
     );
     $("#action-reason").minLength = numeric ? 5 : 10;
     $("#action-reason").maxLength = numeric ? 600 : 8000;
-    $("#numeric-editor").hidden = !numeric;
-    $("#edit-field").disabled = !numeric;
-    $("#edit-value").disabled = !numeric;
-    $("#edit-value").required = numeric;
+    $("#numeric-editor").hidden = true;
+    $("#edit-field").disabled = true;
+    $("#edit-value").disabled = true;
+    $("#edit-value").required = false;
+    $("#action-reason").disabled = Boolean(inline);
     $("#dialog-access").value = state.accessPhrase;
     $("#dialog-access-field").hidden = Boolean(state.accessPhrase);
-    setDraftFields(action, localDraft(action, scope, order));
+    setDraftFields(
+      action,
+      decorateDraft(
+        localDraft(action, scope, order),
+        selection,
+        metrics(ordersForScope(scope)),
+        action,
+      ),
+    );
     if (numeric) {
       $("#edit-field").value = field;
       $("#edit-value").value = String(order[field]);
@@ -1178,7 +1546,14 @@
     }
     $("#action-dialog").returnValue = "";
     $("#action-dialog").showModal();
-    if (numeric) return;
+    if (numeric) {
+      $("#prepare-action").hidden = true;
+      $("#back-to-edit").hidden = false;
+      text("#back-to-edit", "Return to cell");
+      await prepareAction({ preventDefault() {} });
+      return;
+    }
+    text("#back-to-edit", "Edit request");
     pending.preparing = true;
     $("#prepare-action").disabled = true;
     setFormStatus("Loading a draft from the current server data…");
@@ -1201,8 +1576,17 @@
         return;
       }
       if (!pending.dirty) {
-        const defaults = result.data.defaults || {};
+        const defaults = decorateDraft(
+          result.data.defaults || {},
+          selection,
+          result.data.metrics,
+          action,
+        );
         setDraftFields(action, defaults);
+        text(
+          "#review-context",
+          `${selectionSummary(selection, result.data.metrics)} · ${scopeLabel(scope)} · ${result.data.recordsInScope.length} records in scope`,
+        );
       }
       setFormStatus(
         result.data.missing?.length
@@ -1224,8 +1608,14 @@
   }
   function closeAction() {
     if (state.submitting) return;
+    const pending = state.pending;
     $("#action-dialog").close();
     state.pending = null;
+    const target = pending?.inlineChange
+      ? $("#inline-edit-value")
+      : pending?.returnFocus;
+    if (target?.isConnected) target.focus({ preventScroll: true });
+    else $("#view-title").focus({ preventScroll: true });
   }
   function reviewFingerprint(payload) {
     return JSON.stringify({
@@ -1248,9 +1638,9 @@
       ...(pending.recordId ? { recordId: pending.recordId } : {}),
     };
     if (pending.action === "supabase") {
-      const change = currentChange();
+      const change = pending.inlineChange || currentChange();
       if (
-        !$("#edit-value").value ||
+        (!pending.inlineChange && !$("#edit-value").value) ||
         !Number.isFinite(change.newValue) ||
         change.newValue < 0 ||
         change.newValue === change.expectedValue
@@ -1307,7 +1697,8 @@
       pending.reviewed = reviewed;
       pending.snapshot = preview.snapshot;
       pending.fingerprint = fingerprint;
-      $("#action-fields").hidden = true;
+      $("#action-fields").hidden =
+        !pending.inlineChange || Boolean(state.accessPhrase);
       $("#exact-preview").hidden = false;
       $("#prepare-action").hidden = true;
       $("#back-to-edit").hidden = false;
@@ -1319,6 +1710,10 @@
         pending.action === "supabase"
           ? `${pending.recordId} · numeric correction`
           : preview.defaults.subject || preview.defaults.title,
+      );
+      text(
+        "#review-context",
+        `${selectionSummary(pending.selection, preview.metrics)} · ${scopeLabel(pending.scope)} · ${preview.recordsInScope.length} records in scope`,
       );
       text(
         "#preview-destination",
@@ -1469,6 +1864,7 @@
           "#data-status",
           `${state.orders.length} synthetic orders · read from Supabase`,
         );
+        state.inlineEdit = null;
         render();
       }
     }
@@ -1496,6 +1892,43 @@
     }
   }
   function bindEvents() {
+    document.addEventListener("pointerdown", (event) => {
+      if (
+        state.menu &&
+        !$("#context-menu").contains(event.target) &&
+        !state.menu.trigger?.contains(event.target)
+      )
+        closeContext(false);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (!state.menu) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeContext();
+        return;
+      }
+      if (event.key === "Tab") {
+        closeContext();
+        return;
+      }
+      const buttons = [...$("#context-menu").querySelectorAll("button")];
+      let index = buttons.indexOf(document.activeElement);
+      if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+        event.preventDefault();
+        index =
+          event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? buttons.length - 1
+              : (index +
+                  (event.key === "ArrowDown" ? 1 : -1) +
+                  buttons.length) %
+                buttons.length;
+        buttons[index].focus();
+      }
+    });
+    window.addEventListener("resize", () => closeContext(false));
+
     $("#nav-overview").addEventListener("click", (event) => {
       event.preventDefault();
       goOverview();
@@ -1555,8 +1988,6 @@
       render();
       focusView();
     });
-    $("#email-view").addEventListener("click", () => openAction("email"));
-    $("#trello-segment").addEventListener("click", () => openAction("trello"));
     $("#lab-access").addEventListener("input", (event) => {
       state.accessPhrase = event.target.value.trim();
       $("#dialog-access").value = state.accessPhrase;
@@ -1594,6 +2025,10 @@
     $("#confirm-action").addEventListener("click", executeAction);
     $("#back-to-edit").addEventListener("click", () => {
       if (!state.submitting) {
+        if (state.pending?.inlineChange) {
+          closeAction();
+          return;
+        }
         editableStage();
         setFormStatus("Edit the request, then review it again.");
       }
@@ -1601,12 +2036,20 @@
     $("#cancel-action").addEventListener("click", closeAction);
     $("#close-dialog").addEventListener("click", closeAction);
     $("#action-dialog").addEventListener("cancel", (event) => {
-      if (state.submitting) event.preventDefault();
+      event.preventDefault();
+      if (!state.submitting) closeAction();
     });
     $("#action-dialog").addEventListener("close", () => {
       if (!state.submitting) state.pending = null;
     });
     $("#export-history").addEventListener("click", exportHistory);
+    $("#show-history-toggle").addEventListener("click", () => {
+      state.historyExpanded = !state.historyExpanded;
+      renderHistory();
+    });
+    $(".top-nav a[href='#history']").addEventListener("click", () => {
+      $("#history").open = true;
+    });
     window.addEventListener("pagehide", () => {
       state.accessPhrase = "";
       $("#lab-access").value = "";

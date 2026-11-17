@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="./styles.css" />
     <script src="./app.js" defer></script>
   </head>
-  <body>
+  <body class="dashboard-app">
     <a class="skip-link" href="#main">Skip to dashboard</a>
     <header class="topbar">
       <a
@@ -25,6 +25,7 @@
           ><span class="brand-lab">action lab</span></span
         ></a
       >
+      <p class="sidebar-section-label">Retail operations</p>
       <nav class="top-nav" aria-label="Main navigation">
         <button id="nav-overview" type="button" aria-current="page">
           Overview
@@ -104,9 +105,7 @@
           </div>
           <div class="scope-actions">
             <button id="download-csv" class="button secondary" type="button">
-              Download CSV ↓</button
-            ><button id="email-view" class="button primary" type="button">
-              Email this view ↗
+              Download CSV ↓
             </button>
           </div>
         </div>
@@ -169,7 +168,6 @@
             aria-label="A record worth investigating"
           >
             <div>
-              <p class="eyebrow">A SIGNAL TO FOLLOW</p>
               <h3 id="case-title">Follow the margin signal</h3>
               <p id="case-summary">
                 Explore the Northeast / Workspace segment and inspect NS-1041.
@@ -186,7 +184,7 @@
                   <p class="eyebrow">DRILL INTO A REGION</p>
                   <h3 id="region-title">Net revenue by region</h3>
                 </div>
-                <span class="chart-unit">Click a bar →</span>
+                <span class="chart-unit">Select a bar · actions ⋯</span>
               </div>
               <div
                 id="region-chart"
@@ -203,7 +201,7 @@
                   <p class="eyebrow">DRILL INTO A CATEGORY</p>
                   <h3 id="category-title">Contribution by category</h3>
                 </div>
-                <span class="chart-unit">Click a bar →</span>
+                <span class="chart-unit">Select a bar · actions ⋯</span>
               </div>
               <div
                 id="category-chart"
@@ -227,6 +225,12 @@
             </p>
           </section>
         </div>
+      </section>
+      <section
+        id="workspace"
+        class="workspace-grid"
+        aria-label="Records in the current view"
+      >
         <div id="segment-view" hidden>
           <section class="segment-banner" aria-labelledby="segment-title">
             <div>
@@ -234,9 +238,6 @@
               <h3 id="segment-title">Selected segment</h3>
               <p id="segment-description"></p>
             </div>
-            <button id="trello-segment" class="button primary" type="button">
-              Create a Trello task ↗
-            </button>
           </section>
           <section class="panel revenue-panel">
             <div class="panel-heading">
@@ -244,21 +245,15 @@
                 <p class="eyebrow">NARROW THE QUESTION</p>
                 <h3 id="segment-chart-title">Segment breakdown</h3>
               </div>
-              <span class="chart-unit">Click to drill further →</span>
+              <span class="chart-unit">Select a bar · actions ⋯</span>
             </div>
             <div id="segment-chart" class="region-chart"></div>
           </section>
         </div>
-      </section>
-      <section
-        id="workspace"
-        class="workspace-grid"
-        aria-label="Records in the current view"
-      >
+
         <div id="orders-panel" class="panel orders-panel">
           <div class="panel-heading">
             <div>
-              <p class="eyebrow">THE RECORDS BEHIND THIS VIEW</p>
               <h2 id="orders-title">Order explorer</h2>
             </div>
             <span id="order-count" class="count-pill">24 orders</span>
@@ -287,7 +282,8 @@
             </div>
           </div>
           <div class="table-footer">
-            <span>24 fictional source records. No customer data.</span
+            <span id="table-scope-note"
+              >24 fictional source records. No customer data.</span
             ><span>Click a row or use its Details button →</span>
           </div>
         </div>
@@ -298,19 +294,17 @@
           hidden
         ></aside>
       </section>
-      <section
-        id="history"
-        class="panel history-panel"
-        aria-labelledby="history-title"
-      >
+      <details id="history" class="panel history-panel">
+        <summary class="history-summary">
+          <span>Action activity</span
+          ><span id="history-summary-count">No actions yet</span>
+        </summary>
         <div class="panel-heading">
           <div>
             <p class="eyebrow">CLOSE THE LOOP</p>
             <h2 id="history-title">Action activity</h2>
             <p class="panel-description">
-              Every request keeps its scope, values and evidence. Accepted,
-              verified and unknown results stay distinct. This activity list is
-              local; database values are read from the server.
+              Requests and verification evidence are saved in this browser.
             </p>
           </div>
           <div class="history-tools">
@@ -330,7 +324,15 @@
           hidden
         ></div>
         <div id="history-list"></div>
-      </section>
+        <button
+          id="show-history-toggle"
+          type="button"
+          class="quiet-button"
+          hidden
+        >
+          Show all activity
+        </button>
+      </details>
       <footer class="page-footer">
         <p>
           <strong>Northstar</strong> is fictional. All 24 records are synthetic.
@@ -375,7 +377,7 @@
             ><span id="title-label">Title</span
             ><input id="action-title" maxlength="140"
           /></label>
-          <label class="form-field"
+          <label id="reason-field" class="form-field"
             ><span id="reason-label">Message</span
             ><textarea
               id="action-reason"
@@ -456,6 +458,13 @@
         </div>
       </form>
     </dialog>
+    <div
+      id="context-menu"
+      class="context-menu"
+      role="menu"
+      aria-label="Actions for the selected data"
+      hidden
+    ></div>
     <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   </body>
 </html>

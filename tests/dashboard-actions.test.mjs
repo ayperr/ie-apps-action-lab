@@ -165,3 +165,59 @@ test("GitHub preview uses current corrected values, segment context and source e
   for (const content of ["Category: Workspace", "Region: Northeast", "Channel: Online", "Cost: USD 1080", "Revision: 1", "freight allocation of USD 240 was imported twice", "regression case", "importing the same source twice"]) assert.equal(preview.body.defaults.body.includes(content), true);
   assert.match(preview.body.defaults.title, /Prevent duplicate freight allocation/);
 });
+
+test("selected bars constrain canonical metrics and a selected record stays in scope", async () => {
+  const service = createDashboardActionsService({ seed, env });
+  const scope = { category: "Workspace", region: "Northeast" };
+  const bar = await service.submit({ operation: "preview", action: "email", scope }, headers);
+  assert.deepEqual(bar.body.snapshot.scope, scope);
+  assert.deepEqual(bar.body.snapshot.recordIds, ["NS-1041"]);
+  assert.deepEqual(bar.body.metrics, scopeMetrics([seed.orders[0]], seed.meta.asOf));
+  assert.match(bar.body.defaults.subject, /category: Workspace · region: Northeast/);
+  assert.doesNotMatch(bar.body.defaults.body, /NS-1042/);
+  const outside = await service.submit({ operation: "preview", action: "trello", scope, recordId: "NS-1042" }, headers);
+  assert.equal(outside.status, 400);
+});
+
+test("selected-record email and Trello drafts preserve canonical context and provenance through provider read-back", async () => {
+  const contextSeed = { ...seed, orders: seed.orders.map(row => ({ ...row, note: "Synthetic audit evidence for the selected order." })) };
+  const sent = {};
+  const fetchImpl = async (url, init) => {
+    if (url === "https://api.resend.com/emails") { sent.email = JSON.parse(init.body); return json({ id: requestId }); }
+    if (url.startsWith("https://api.resend.com/emails/")) return json({ id: requestId, ...sent.email, last_event: "delivered" });
+    if (url === "https://api.trello.com/1/cards") {
+      sent.trello = JSON.parse(init.body);
+      return json({ id: "d".repeat(24), name: sent.trello.name, desc: sent.trello.desc, idList: env.TRELLO_LIST_ID, url: "https://trello.com/c/selected1" });
+    }
+    if (url.startsWith("https://api.trello.com/1/cards/")) return json({ id: "d".repeat(24), name: sent.trello.name, desc: sent.trello.desc, idList: env.TRELLO_LIST_ID, url: "https://trello.com/c/selected1" });
+    throw new Error("Unexpected provider endpoint");
+  };
+  const service = createDashboardActionsService({ seed: contextSeed, env, fetchImpl });
+  for (const action of ["email", "trello"]) {
+    const selection = { action, recordId: "NS-1041", scope: { region: "Northeast", search: "NS-1041" } };
+    const preview = await service.submit({ ...selection, operation: "preview" }, headers);
+    assert.equal(preview.status, 200);
+    const draft = preview.body.defaults, body = draft.body || draft.description;
+    for (const content of ["Selected record", "Record: NS-1041", "Region: Northeast", "Cost: USD 1320", "Revision: 0", "Synthetic audit evidence", "Current filtered view"]) assert.equal(body.includes(content), true);
+    assert.match(draft.subject || draft.title, /NS-1041 · Summit desk bundle/);
+    const reply = await service.submit({ ...selection, operation: "execute", draft, requestId, confirmed: true, snapshot: preview.body.snapshot }, headers);
+    assert.equal(reply.body.state, action === "email" ? "accepted" : "verified");
+    assert.equal(reply.body.verification.body, true);
+  }
+  for (const body of [sent.email.text, sent.trello.desc]) {
+    assert.match(body, /Source record: NS-1041/); assert.match(body, new RegExp(`Action request: ${requestId}`));
+    assert.doesNotMatch(body, /NS-1042/);
+  }
+});
+
+test("a selected-record snapshot rejects changed facts without sending or changing the frozen scope", async () => {
+  let saved = rows(), sends = 0;
+  const service = createDashboardActionsService({ seed, env: { ...env, LAB_SUPABASE_URL: "https://abcdefghijklmnopqrst.supabase.co" }, transports: { readSupabaseOrders: async () => ({ state: "verified", records: saved }), createTrelloCard: async () => { sends++; } } });
+  const selection = { action: "trello", scope: { region: "Northeast", search: "NS-1041" }, recordId: "NS-1041" };
+  const preview = await service.submit({ ...selection, operation: "preview" }, headers);
+  saved = saved.map(row => row.recordId === "NS-1041" ? { ...row, cost: 1080, revision: 1 } : row);
+  const reply = await service.submit({ ...selection, operation: "execute", draft: preview.body.defaults, snapshot: preview.body.snapshot, requestId, confirmed: true }, headers);
+  assert.equal(reply.status, 409); assert.equal(sends, 0);
+  assert.deepEqual(reply.body.snapshot.scope, selection.scope);
+  assert.deepEqual(reply.body.snapshot.recordIds, ["NS-1041"]);
+});
