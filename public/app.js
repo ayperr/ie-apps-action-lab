@@ -12,6 +12,12 @@
     supabase: "Numeric correction",
     github: "GitHub issue",
   };
+  const SERVICES = {
+    email: { provider: "resend", label: "Email · Resend" },
+    trello: { provider: "trello", label: "Trello · Card" },
+    github: { provider: "github", label: "GitHub · Issue" },
+    supabase: { provider: "supabase", label: "Supabase · Database" },
+  };
   const RESULTS = {
     verified: "Verified",
     accepted: "Accepted · not delivered",
@@ -81,6 +87,21 @@
   }
   function text(selector, value) {
     $(selector).textContent = String(value ?? "");
+  }
+  function serviceBadge(action) {
+    const service = SERVICES[action];
+    const badge = node("span", "service-badge");
+    badge.dataset.service = service.provider;
+    const logo = node("img", "service-logo");
+    logo.src = new URL(
+      `./icons/${service.provider}.svg`,
+      document.baseURI,
+    ).href;
+    logo.alt = "";
+    logo.width = 18;
+    logo.height = 18;
+    badge.append(logo, node("span", "service-label", service.label));
+    return badge;
   }
   function net(order) {
     return order.revenue - order.refund;
@@ -271,7 +292,10 @@
       button.type = "button";
       button.dataset.contextAction = action;
       button.setAttribute("role", "menuitem");
-      button.append(node("strong", "", label), node("span", "", hint));
+      button.append(
+        node("strong", "", label),
+        SERVICES[action] ? serviceBadge(action) : node("span", "", hint),
+      );
       button.addEventListener("click", () => {
         const origin = state.menu?.trigger;
         closeContext(false);
@@ -821,7 +845,7 @@
       renderDetail();
       $(`.numeric-value-button[data-field="${edit.field}"]`)?.focus();
     });
-    actions.append(review, cancel);
+    actions.append(serviceBadge("supabase"), review, cancel);
     form.append(valueLabel, reasonLabel, preview, actions);
     calculate();
     form.addEventListener("submit", (event) => {
@@ -1476,6 +1500,7 @@
       snapshot: null,
     };
     state.pending = pending;
+    $("#dialog-service").replaceChildren(serviceBadge(action));
     editableStage();
     setFormStatus("");
     const numeric = action === "supabase";
