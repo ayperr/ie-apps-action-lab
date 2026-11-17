@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="light" />
     <meta
       name="description"
-      content="Review and test four action paths from one synthetic Northstar order."
+      content="Try a message draft, then review four real integrations for one synthetic Northstar order."
     />
     <title>Action preflight · Northstar</title>
     <link rel="stylesheet" href="./styles.css" />
@@ -42,9 +42,9 @@
             One signal.<br /><span>Four ways to act.</span>
           </h1>
           <p class="hero-description">
-            Inspect the destination, review the exact content, then choose
-            whether to act. A draft, an accepted request and a verified result
-            are different things.
+            Start with a message draft, then try four real actions: a Trello
+            card, an email, a saved Supabase review and a GitHub PR. Inspect the
+            destination and exact content before confirming.
           </p>
         </div>
         <aside class="source-card" aria-labelledby="source-title">
@@ -121,13 +121,16 @@
         </div>
       </section>
 
-      <section class="action-grid" aria-label="Four action paths">
+      <section
+        class="action-grid"
+        aria-label="Draft demo and four real action paths"
+      >
         <article class="action-card draft-card" aria-labelledby="draft-title">
           <div class="card-heading">
-            <span class="action-number">01</span
+            <span class="action-number">00</span
             ><span class="state-badge state-draft">Draft only</span>
           </div>
-          <p class="eyebrow">EMAIL / TEAMS</p>
+          <p class="eyebrow">START HERE · EMAIL / TEAMS DRAFT</p>
           <h2 id="draft-title">Start a conversation.</h2>
           <p class="action-description">
             Open a prefilled message in your own mail or Teams client. You
@@ -178,7 +181,7 @@
           aria-labelledby="trello-title"
         >
           <div class="card-heading">
-            <span class="action-number">02</span
+            <span class="action-number">01</span
             ><span id="trello-state" class="state-badge">Not checked</span>
           </div>
           <p class="eyebrow">TRELLO</p>
@@ -221,7 +224,7 @@
           aria-labelledby="email-title"
         >
           <div class="card-heading">
-            <span class="action-number">03</span
+            <span class="action-number">02</span
             ><span id="email-state" class="state-badge">Not checked</span>
           </div>
           <p class="eyebrow">RESEND</p>
@@ -257,6 +260,80 @@
             aria-live="polite"
             hidden
           ></div>
+        </article>
+        <article
+          class="action-card"
+          data-provider="supabase"
+          aria-labelledby="supabase-title"
+        >
+          <div class="card-heading">
+            <span class="action-number">03</span
+            ><span id="supabase-state" class="state-badge">Not checked</span>
+          </div>
+          <p class="eyebrow">SUPABASE</p>
+          <h2 id="supabase-title">Save a reviewed record.</h2>
+          <p class="action-description">
+            Write the reviewed status for NS-1041 to the configured database.
+            Reload this page and read it again to see that the review survives
+            outside your browser.
+          </p>
+          <div class="destination">
+            <span>Destination</span>
+            <p id="supabase-destination">Check configured services first.</p>
+          </div>
+          <p id="supabase-detail" class="provider-detail">
+            No action has been requested.
+          </p>
+          <details class="preview-block" id="supabase-preview" hidden>
+            <summary>Review the exact database write</summary>
+            <h3 id="supabase-preview-title"></h3>
+            <pre id="supabase-preview-body"></pre>
+          </details>
+          <button
+            class="button primary review-action"
+            data-action="supabase"
+            type="button"
+            disabled
+          >
+            Review database save →
+          </button>
+          <div
+            id="supabase-result"
+            class="action-result"
+            role="status"
+            aria-live="polite"
+            hidden
+          ></div>
+          <section
+            class="saved-review-panel"
+            aria-labelledby="saved-review-title"
+          >
+            <p class="eyebrow">INDEPENDENT DATABASE READ</p>
+            <h3 id="saved-review-title">What is saved now?</h3>
+            <div
+              id="supabase-saved-review"
+              class="saved-review-evidence"
+              role="status"
+              aria-live="polite"
+            >
+              <p>
+                Not checked. Enter the lab access phrase and check configured
+                services to read the saved review from the server.
+              </p>
+            </div>
+            <button
+              id="read-saved-review"
+              class="button secondary small"
+              type="button"
+              disabled
+            >
+              Read saved review again ↻
+            </button>
+            <p class="action-note">
+              This performs a GET only. It never saves again and does not use
+              this browser’s local action history as proof.
+            </p>
+          </section>
         </article>
         <article
           class="action-card"

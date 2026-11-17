@@ -3,15 +3,17 @@
 
 const API = "/api/action-preflight";
 const ATTEMPTS_KEY = "northstar-preflight:v1:attempts";
-const ACTIONS = ["trello", "email", "github"];
+const ACTIONS = ["trello", "email", "supabase", "github"];
 const LABELS = {
   trello: "Trello card",
   email: "Resend email",
+  supabase: "Supabase review save",
   github: "GitHub pull request",
 };
 const CONFIRM_LABELS = {
   trello: "Create real card →",
   email: "Send real test email →",
+  supabase: "Save reviewed to Supabase →",
   github: "Open real pull request →",
 };
 const STATE_LABELS = {
@@ -80,6 +82,11 @@ function updateButtons() {
     button.disabled = !canReview(button.dataset.action);
   });
   $("check-services").disabled = model.checking || model.sending;
+  $("read-saved-review").disabled =
+    !model.authenticated ||
+    model.providers.supabase?.configured !== true ||
+    model.checking ||
+    model.sending;
   $("confirm-send").disabled =
     !model.pending ||
     !$("confirm-consent").checked ||
@@ -136,6 +143,7 @@ function renderConnections() {
       if (action === "github") setText("github-preview-diff", preview.diff);
     }
   }
+  renderSavedReview();
   updateButtons();
 }
 
@@ -176,7 +184,7 @@ async function checkServices() {
     ).length;
     setText(
       "service-status",
-      `${ready} of 3 real integrations configured. Checking did not perform any action.${!model.enabled ? " Real actions are disabled on this server (LAB_PREFLIGHT_ENABLED)." : ""}${model.authorizationConfigured === false ? " The server also needs its lab access phrase configured." : model.authenticated ? " Access verified. Review a configured action before sending." : " Enter the correct lab access phrase, then check connections again to reveal and verify the exact destinations."}`,
+      `${ready} of ${ACTIONS.length} real integrations configured. Checking did not perform any action.${!model.enabled ? " Real actions are disabled on this server (LAB_PREFLIGHT_ENABLED)." : ""}${model.authorizationConfigured === false ? " The server also needs its lab access phrase configured." : model.authenticated ? " Access verified. Review a configured action before sending." : " Enter the correct lab access phrase, then check connections again to reveal and verify the exact destinations."}`,
     );
     renderConnections();
   } catch {
@@ -184,6 +192,7 @@ async function checkServices() {
     model.authenticated = false;
     model.providers = {};
     model.previews = {};
+    renderSavedReview();
     for (const action of ACTIONS) {
       if (!model.attempts.has(action))
         setBadge(action, "Status unavailable", "unknown");
@@ -275,7 +284,9 @@ function openReview(action) {
       ? "This sends a real email to the test recipient below. An accepted response alone does not prove that it reached the inbox."
       : action === "github"
         ? "This creates the proposed change and opens a real pull request. It does not merge the pull request."
-        : "This creates one real card in the test list below. The server will report whether it could verify the card.",
+        : action === "supabase"
+          ? "This writes the reviewed status for NS-1041 to the configured database. The source transaction amounts stay unchanged. The server will read the row back, and you can check it again after reloading."
+          : "This creates one real card in the test list below. The server will report whether it could verify the card.",
   );
   setText("confirm-destination", model.pending.destination);
   setText("confirm-preview-title", model.pending.preview.title);
@@ -303,6 +314,7 @@ function safeProviderUrl(action, value) {
       trello: ["trello.com", "www.trello.com"],
       github: ["github.com", "www.github.com"],
       email: ["resend.com"],
+      supabase: ["supabase.com"],
     };
     return url.protocol === "https:" &&
       !url.username &&
@@ -329,6 +341,67 @@ function resultFact(parent, label, value) {
   appendText(group, "dt", label);
   appendText(group, "dd", String(value));
   parent.append(group);
+}
+
+// A fresh authenticated GET is evidence of database persistence, separate from local history.
+function renderSavedReview() {
+  const container = $("supabase-saved-review");
+  container.replaceChildren();
+  if (!model.authenticated) {
+    appendText(
+      container,
+      "p",
+      "Not checked with verified access. Enter the lab access phrase and check configured services to read the saved review from the server.",
+    );
+    return;
+  }
+  const provider = model.providers.supabase;
+  if (provider?.configured !== true) {
+    appendText(
+      container,
+      "p",
+      "Supabase is not configured. No database read is claimed.",
+    );
+    return;
+  }
+  const review = provider.savedReview;
+  if (review?.state === "not_found") {
+    appendText(container, "strong", "No saved review found");
+    appendText(
+      container,
+      "p",
+      "The server read found no saved review for NS-1041. No write was made by this check.",
+    );
+    return;
+  }
+  if (
+    review?.state !== "verified" ||
+    review.recordId !== "NS-1041" ||
+    review.status !== "reviewed" ||
+    !UUID.test(review.requestId || "")
+  ) {
+    appendText(container, "strong", "Saved review not verified");
+    appendText(
+      container,
+      "p",
+      "This check did not establish a saved reviewed row for NS-1041. Do not infer persistence from the local activity result.",
+    );
+    return;
+  }
+  appendText(container, "strong", "Saved review found · server read");
+  appendText(
+    container,
+    "p",
+    "Read from Supabase on this connection check. This evidence is independent of this browser’s local action history.",
+  );
+  const facts = document.createElement("dl");
+  facts.className = "result-facts";
+  resultFact(facts, "Record", review.recordId);
+  resultFact(facts, "Saved status", review.status);
+  resultFact(facts, "Request ID", review.requestId);
+  resultFact(facts, "Updated at", review.updatedAt);
+  resultFact(facts, "Database row ID", review.id);
+  container.append(facts);
 }
 
 function renderResult(action, result, requestId) {
@@ -383,6 +456,8 @@ function renderResult(action, result, requestId) {
   resultFact(facts, "Provider ID", result.id ?? result.providerId);
   resultFact(facts, "Provider status", result.providerStatus);
   resultFact(facts, "Delivery event", result.deliveryState);
+  resultFact(facts, "Saved status", result.savedStatus ?? result.status);
+  resultFact(facts, "Updated at", result.updatedAt);
   resultFact(facts, "Checked at", result.checkedAt);
   resultFact(facts, "HTTP status", result.httpStatus);
   if (typeof result.verification === "string")
@@ -570,6 +645,7 @@ async function performAction(event) {
 $("lab-access").addEventListener("input", () => {
   model.accessPhrase = $("lab-access").value.trim();
   model.authenticated = false;
+  renderSavedReview();
   setText(
     "service-status",
     "Access phrase changed. Check configured services again to verify access and reveal the exact destinations. No action has been sent by changing this field.",
@@ -580,9 +656,11 @@ $("clear-access").addEventListener("click", () => {
   model.accessPhrase = "";
   model.authenticated = false;
   $("lab-access").value = "";
+  renderSavedReview();
   updateButtons();
 });
 $("check-services").addEventListener("click", checkServices);
+$("read-saved-review").addEventListener("click", checkServices);
 for (const id of ["draft-channel", "draft-recipient", "draft-tenant"])
   $(id).addEventListener("input", updateDraft);
 $("open-draft").addEventListener("click", (event) => {

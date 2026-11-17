@@ -468,3 +468,46 @@ pre.diff-preview {
     padding: 21px;
   }
 }
+
+/* A draft is the warm-up; the four real integrations form the main two-by-two grid. */
+.draft-card {
+  grid-column: 1 / -1;
+}
+.draft-card .draft-fields {
+  grid-template-columns: 1fr 1fr;
+}
+.draft-card #tenant-field {
+  grid-column: 1 / -1;
+}
+.saved-review-panel {
+  margin-top: 22px;
+  padding: 19px;
+  border: 1px solid #cdddce;
+  border-radius: 9px;
+  background: #f2f7f3;
+}
+.saved-review-panel h3 {
+  margin: 6px 0 13px;
+  font-size: 18px;
+}
+.saved-review-evidence {
+  font-size: 12px;
+  color: #4f685a;
+  overflow-wrap: anywhere;
+}
+.saved-review-evidence strong {
+  color: var(--teal-dark);
+  display: block;
+  margin-bottom: 7px;
+}
+.saved-review-panel > .button {
+  margin-top: 12px;
+}
+.saved-review-panel > .action-note {
+  margin-top: 10px;
+}
+@media (max-width: 700px) {
+  .draft-card .draft-fields {
+    grid-template-columns: 1fr;
+  }
+}

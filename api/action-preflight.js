@@ -5,7 +5,7 @@ export default async function handler(req, res) {
   const reply = (status, body) => { res.statusCode = status; res.end(JSON.stringify(body)); };
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.setHeader("Cache-Control", "no-store");
-  if (req.method === "GET") return reply(200, service.status(req.headers.authorization));
+  if (req.method === "GET") return reply(200, await service.statusWithReadback(req.headers.authorization));
   if (req.method !== "POST") { res.setHeader("Allow", "GET, POST"); return reply(405, { state: "rejected", message: "Use GET or POST." }); }
   try {
     if (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) return reply(403, { state: "rejected", message: "Origin not allowed." });

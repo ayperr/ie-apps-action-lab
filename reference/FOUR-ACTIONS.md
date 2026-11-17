@@ -19,11 +19,13 @@ En **tu proyecto de la app → Settings → Environment Variables**, configura l
 
 No pegues claves en el chat, archivos del repositorio o capturas. Introdúcelas directamente en Vercel. La clave del laboratorio controla este panel temporal; no equivale a un sistema completo de usuarios para producción.
 
-## 1. Preparar borradores de email y Teams
+## 1. Abrir borradores en email y Teams
 
-No requiere credenciales de correo ni de Microsoft. Revisamos que la app prepare un texto editable con el pedido, la anomalía y la acción propuesta.
+No requiere una API key, pero sí un cliente de correo configurado o una cuenta de Teams existente con acceso permitido. Un enlace de Teams puede exigir iniciar sesión y respetar las restricciones del tenant de Microsoft.
 
-**Resultado:** borrador dentro de la app. No es un email enviado ni un mensaje enviado o guardado en Teams. No hace falta activar un tenant de Microsoft para esta prueba.
+**Prueba que cuenta:** desde la app, abrir el compositor del cliente externo correcto con el destinatario y texto esperados, sin enviar. Preparar el texto o generar el enlace dentro de la app no demuestra que ese recorrido funciona. En Teams se comprueba el compositor real después del inicio de sesión; no se sustituye por una previsualización interna. Si el login bloquea la apertura, la comprobación sigue pendiente.
+
+**Resultado:** un borrador visible en la aplicación externa. No es un email ni un mensaje enviados; tampoco se afirma persistencia del borrador si no se ha comprobado.
 
 ## 2. Crear una tarjeta real en Trello
 
