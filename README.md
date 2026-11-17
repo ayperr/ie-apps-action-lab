@@ -55,7 +55,16 @@ The function writes one field and reads it back independently. The dashboard the
 
 ## Verification status
 
-**The new integrated flow needs its own end-to-end evidence.** Earlier standalone email/card/PR/status checks and old screenshots do not verify this dashboard flow, numeric correction or GitHub issue. Until each new result is observed, mark it pending. Each student must configure and test their own copy. Account billing screens were not inspected; functional checks do not certify a Free plan or quota.
+**All four contextual actions passed live checks on 17 November 2026** in the published dashboard ([tested commit](https://github.com/josncmar/ie-apps-action-lab/commit/fef782e984cfb9e907b00e9c488de9dfcabede36)).
+
+| Action | Observed evidence |
+| --- | --- |
+| Overview email | The actual Gmail message matched the edited content and request ID. |
+| Segment Trello | [Card jpJ4XnYL](https://trello.com/c/jpJ4XnYL) was created; an independent GET matched its exact content and destination. |
+| Record Supabase | Cost 1320 → 1080 persisted at revision 1. Reloaded UI and independent SQL matched the request; record contribution became 120 and total contribution 7,773. |
+| Record GitHub | [Issue #2](https://github.com/josncmar/ie-apps-action-lab/issues/2) was created and independently read back with the exact edited content and request ID. |
+
+The instructor’s database now retains cost **1080**. A fresh student project seeds cost **1320** for the exercise; rerunning the seed preserves existing corrections. Do not reset the instructor’s saved correction just to recreate the signal. Each student must still configure and verify their own copy. Account billing screens were not inspected; these checks do not certify a Free plan or quota.
 
 For an uncertain outcome, inspect the existing result before sending again. Keep the request ID. For a numeric conflict, refresh and review the newer record. This classroom lab uses a shared access phrase, not a complete production user system.
 

@@ -63,7 +63,7 @@ Usa **Trello Auth**, no OAuth 2.0. No hacen falta Secret, Client ID, callback ni
 
 ## 3 · Record: corregir una cifra real en Supabase
 
-**Caso incluido:** abre NS-1041 con **Details →**. Su nota de auditoría identifica **$240 de transporte duplicado**. Coste actual **1320**; coste corregido **1080**; contribución **−120 → +120**. No se marca simplemente «revisado»: cambia el número guardado y las métricas que dependen de él.
+**Caso incluido:** abre NS-1041 con **Details →**. Su nota de auditoría identifica **$240 de transporte duplicado**. En un proyecto nuevo, coste inicial **1320**; coste corregido **1080**; contribución **−120 → +120**. No se marca simplemente «revisado»: cambia el número guardado y las métricas que dependen de él.
 
 ### Preparación de tu propio proyecto
 
@@ -111,7 +111,16 @@ Esta función y tabla son nuevas. Los antiguos `setup.sql`, `writeback/index.ts`
 
 ## Evidencia y cierre
 
-**La verificación del nuevo recorrido integrado está pendiente de observar sus resultados reales.** Los envíos, tarjetas, PR y cambios de estado probados en el panel anterior no validan este flujo ni la nueva corrección numérica. No reutilices capturas antiguas como prueba del caso nuevo. Cada alumno debe configurar y comprobar su copia.
+**Las cuatro acciones del nuevo dashboard integrado pasaron pruebas reales el 17 de noviembre de 2026**, sobre el commit publicado `fef782e984cfb9e907b00e9c488de9dfcabede36`.
+
+| Acción | Evidencia observada |
+| --- | --- |
+| Email del overview | Mensaje real en Gmail con el texto editado y el request ID coincidentes. |
+| Trello del segmento | [Tarjeta jpJ4XnYL](https://trello.com/c/jpJ4XnYL), recuperada con GET y contenido/destino exactos. |
+| Corrección Supabase | Coste 1320 → 1080, revisión 1, contribución del registro 120 y total 7.773. La recarga de la UI y una consulta SQL independiente coincidieron con la petición. |
+| GitHub issue del registro | [Issue #2](https://github.com/josncmar/ie-apps-action-lab/issues/2), comprobado con GET y texto editado/request ID exactos. |
+
+La app del profesor conserva ahora coste **1080**. Los proyectos nuevos siembran **1320** para el ejercicio y no heredan su base de datos; volver a ejecutar el seed no pisa correcciones existentes. No reviertas la corrección del profesor solo para recrear la señal. Cada alumno debe configurar y comprobar su propia copia.
 
 Guarda la evidencia de los cuatro puntos: email de la vista, tarjeta del segmento, cifra persistida con métricas recalculadas e issue del registro. Ante un resultado desconocido, comprueba el destino antes de repetir; ante un conflicto numérico, refresca primero. Al terminar, borra la frase del navegador y revoca los tokens temporales que ya no necesites.
 
