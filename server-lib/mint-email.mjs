@@ -32,6 +32,11 @@ export function createMintEmailService({env=process.env,fetchImpl=fetch,loadData
   const authorizationConfigured=typeof env.LAB_ACCESS_KEY==='string'&&env.LAB_ACCESS_KEY.length>=32&&env.LAB_ACCESS_KEY.length<=256;
   const authorized=header=>authorizationConfigured&&typeof header==='string'&&header.startsWith('Bearer ')&&timingSafeEqual(Buffer.from(hash(header.slice(7)),'hex'),Buffer.from(hash(env.LAB_ACCESS_KEY),'hex'));
   const missing=()=>['RESEND_API_KEY','LAB_EMAIL_TO','LAB_ACCESS_KEY'].filter(k=>!env[k]?.trim());
+  const invalid=()=>[
+    env.RESEND_API_KEY&&!/^re_[A-Za-z0-9_-]{8,512}$/.test(env.RESEND_API_KEY)&&'RESEND_API_KEY',
+    env.LAB_EMAIL_TO&&(!emailPattern.test(env.LAB_EMAIL_TO)||env.LAB_EMAIL_TO.toLowerCase().endsWith('@resend.dev'))&&'LAB_EMAIL_TO',
+    env.LAB_ACCESS_KEY&&!authorizationConfigured&&'LAB_ACCESS_KEY'
+  ].filter(Boolean);
   const options={fetchImpl,timeoutMs:12000};
   const transport={createResendEmail,verifyResendEmail,...transports};
   const requests=new Map();
@@ -45,7 +50,7 @@ export function createMintEmailService({env=process.env,fetchImpl=fetch,loadData
   function sourceFooter(finding,metric){return `\n\nSource scope:\n${finding.context}\nSelected KPI: ${labels[metric]}\nDeparture IDs: ${finding.flightIds.join(', ')}\nSnapshot fingerprint: ${finding.fingerprint}\nOpen the scoped overview: https://mint-revenue-lab.vercel.app/?${new URLSearchParams(finding.scope)}`;}
   function status(header){
     const authenticated=authorized(header),configured=validateResendDestination(config)&&authorizationConfigured;
-    return answer(200,'connection',configured?(authenticated?'Email connected; lab access verified.':'Email configured. Enter the lab access phrase to authorize sending.'):'Email setup needs attention.',{configured,authenticated,missing:missing(),authorizationConfigured,recipient:authenticated?config.to||'':'',sender:'onboarding@resend.dev'});
+    return answer(200,'connection',configured?(authenticated?'Email configured; lab access verified. Sending and provider readback still require a reviewed action.':'Email configured. Enter the lab access phrase to authorize sending.'):'Email setup needs attention.',{configured,authenticated,missing:missing(),invalid:invalid(),authorizationConfigured,recipient:authenticated?config.to||'':'',sender:'onboarding@resend.dev'});
   }
   async function submit(input,header){
     if(!allowed(input,['operation','scope','metric','draft','fingerprint','confirmed','requestId'])||!['preview','execute'].includes(input.operation)||!Object.hasOwn(labels,input.metric))return answer(400,'rejected','Choose a supported overview finding.');

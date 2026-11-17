@@ -23,6 +23,7 @@ export function createEmailActions({getContext,navigate}){
   let phrase='',connection=null,context=null,preview=null,requestId=null,reviewedDraft=null,originButton=null,busy=false,sendStarted=false,loadController=null;
   const headers=()=>({'Content-Type':'application/json',...(phrase?{Authorization:'Bearer '+phrase}:{})});
   const text=(id,value)=>{$(id).textContent=value;};
+  const setupIssues=result=>[result.missing.length?'Missing: '+result.missing.join(', '):'',result.invalid?.length?'Invalid format: '+result.invalid.join(', '):''].filter(Boolean).join('. ');
   async function request(body,{signal}={}){
     const response=await fetch('/api/mint-email',{method:body?'POST':'GET',headers:headers(),...(body?{body:JSON.stringify(body)}:{}),cache:'no-store',signal});
     const result=await response.json();
@@ -31,9 +32,9 @@ export function createEmailActions({getContext,navigate}){
   }
   function reportConnection(result){
     connection=result;
-    text('#email-connection-status',result.message+(result.missing.length?' Missing: '+result.missing.join(', ')+'.':''));
+    text('#email-connection-status',result.message+(setupIssues(result)?' '+setupIssues(result)+'.':''));
     if(!result.configured)text('#email-connection-status',$('#email-connection-status').textContent+' Enter provider settings directly in Vercel; never in this page.');
-    if(dialog.open&&!sendStarted)text('#email-form-status',result.configured?(result.authenticated?'Lab access verified. Review the message before sending.':'Enter your lab phrase in Email connection before sending.'):'Server setup is incomplete: '+result.missing.join(', '));
+    if(dialog.open&&!sendStarted)text('#email-form-status',result.configured?(result.authenticated?'Lab access verified. Review the message before sending.':'Enter your lab phrase in Email connection before sending.'):'Server setup needs attention. '+setupIssues(result));
     return result;
   }
   async function checkConnection(){
@@ -84,7 +85,7 @@ export function createEmailActions({getContext,navigate}){
       reviewedDraft=draft;preview=checked;
       text('#email-reviewed-to','To: '+draft.to);text('#email-reviewed-subject',draft.subject);text('#email-reviewed-body',draft.body+preview.sourceFooter+`\n\n---\nSource record: mint-portfolio\nAction request: ${requestId}\n[ie-lab-action:${requestId}]`);
       $('#email-edit').hidden=true;$('#email-review').hidden=false;$('#email-review-button').hidden=true;$('#email-back').hidden=false;$('#email-send').hidden=false;$('#email-consent').checked=false;$('#email-send').disabled=true;
-      text('#email-form-status',checked.connection.configured?(checked.connection.authenticated?'Ready for your explicit confirmation. No email has been sent.':'Email is configured. Enter your lab phrase in Email connection before sending.'):'Missing server settings: '+checked.connection.missing.join(', ')+'. No email has been sent.');$('#email-consent').focus();
+      text('#email-form-status',checked.connection.configured?(checked.connection.authenticated?'Ready for your explicit confirmation. No email has been sent.':'Email is configured. Enter your lab phrase in Email connection before sending.'):'Server setup needs attention. '+setupIssues(checked.connection)+'. No email has been sent.');$('#email-consent').focus();
     }catch(error){text('#email-form-status',error.message);}finally{busy=false;$('#email-review-button').disabled=false;}
   });
   $('#email-consent').addEventListener('change',event=>{$('#email-send').disabled=!event.target.checked||sendStarted;});
