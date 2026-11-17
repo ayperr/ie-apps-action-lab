@@ -23,8 +23,16 @@
       "Use the fixed asOf date so the classroom example does not change over time.",
       "An order can match more than one alert; count distinct orders for an overall attention metric.",
       "A late or negative-margin order indicates a reason to investigate, not proof of its cause.",
-      "Destination names and teams are fictional. Practice actions must not send external messages."
-    ]
+      "Use fictional data and destinations you own. Review and confirm before creating a real external result."
+    ],
+    "classroomCase": {
+      "recordId": "NS-1041",
+      "field": "cost",
+      "reportedValue": 1320,
+      "proposedValue": 1080,
+      "evidence": "Synthetic classroom audit: a USD 240 freight charge was counted twice in the cost allocation.",
+      "learningGoal": "Trace a margin alert from overview to segment to order, then persist the supported correction and verify recalculated metrics."
+    }
   },
   "orders": [
     {
@@ -42,7 +50,7 @@
       "cost": 1320,
       "refund": 0,
       "owner": "Finance operations",
-      "note": "An introductory discount and a freight adjustment were recorded. Review the price and cost allocation before recommending a correction."
+      "note": "Synthetic classroom audit: a USD 240 freight charge was counted twice in the USD 1,320 cost allocation. The proposed corrected cost is USD 1,080. Review the evidence before saving a correction."
     },
     {
       "id": "NS-1042",

@@ -1,80 +1,34 @@
-/* Real action starter: same-origin server routes deliver synthetic events to
- * a personal ntfy.sh receiver and verify the captured request.
- * Practice mode remains a separate local simulator. No API secrets are used.
+/* Northstar: three analytical levels and real, reviewed contextual actions.
+ * The server owns destinations, authoritative records and provider credentials.
  */
 (() => {
   "use strict";
-
-  const STORAGE_KEY = "northstar-action-lab:v1:history";
+  const API = "/api/actions";
+  const HISTORY_KEY = "northstar-dashboard:v2:actions";
   const MAX_HISTORY = 150;
-  const RECEIVER_KEY = "northstar-action-lab:v1:receiver";
-  const CAPTURE_ID = /^[A-Za-z0-9_-]{1,64}$/;
-  const UUID =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  const viewerUrl = (id) => `https://ntfy.sh/ie-action-lab-${id}`;
-  const REAL_RESULTS = {
-    received: {
-      label: "Receipt verified",
-      icon: "✓",
-      detail:
-        "ntfy.sh captured this real event. Open the test inbox and match the request ID to inspect the delivered payload.",
-    },
-    accepted: {
-      label: "Send accepted",
-      icon: "↗︎",
-      detail:
-        "The service accepted the HTTP request, but its captured receipt is not verified yet. Check the receipt before sending anything again.",
-    },
-    unknown: {
-      label: "Receipt unknown",
-      icon: "?",
-      detail:
-        "The app could not confirm the external outcome. The event may already exist. Verify its receipt before considering another send.",
-    },
-    rejected: {
-      label: "Send rejected",
-      icon: "×",
-      detail:
-        "The service rejected the event. Review the error and inbox availability; this is not a verified delivery.",
-    },
-    sending: {
-      label: "Sending real event",
-      icon: "…",
-      detail:
-        "Sending the confirmed synthetic event to your test inbox, then checking its receipt.",
-    },
+  const ACTION_NAMES = {
+    email: "Email summary",
+    trello: "Trello task",
+    supabase: "Numeric correction",
+    github: "GitHub issue",
+  };
+  const RESULTS = {
+    verified: "Verified",
+    accepted: "Accepted · not delivered",
+    unknown: "Outcome unknown",
+    rejected: "Rejected",
+    not_configured: "Missing configuration",
+    conflict: "Data changed · refresh",
+    unavailable: "Current data unavailable",
+    sending: "Request in progress",
   };
   const SIGNALS = {
     negative: { label: "Negative contribution", short: "Negative margin" },
     late: { label: "Late delivery", short: "Late delivery" },
     refund: { label: "High refund", short: "High refund" },
   };
-  const RESULTS = {
-    success: {
-      label: "Simulated success",
-      icon: "✓",
-      detail:
-        "This local simulation accepted the request. No external event was sent. Switch to Live test to send and verify a real ntfy.sh event.",
-    },
-    rejected: {
-      label: "Simulated rejection",
-      icon: "×",
-      detail:
-        "This local simulation represents a rejected request. No external event was sent. Real failures must stay separate from verified deliveries.",
-    },
-    uncertain: {
-      label: "Simulated unknown result",
-      icon: "?",
-      detail:
-        "The rehearsal lost the response after a request was sent. In a live integration, the external action may already exist. Check the destination before retrying to avoid a duplicate. This practice did not send anything.",
-    },
-    processing: {
-      label: "Practice in progress",
-      icon: "…",
-      detail:
-        "Rehearsing the request locally. No external service is being contacted.",
-    },
-  };
+  const UUID =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   const $ = (selector) => document.querySelector(selector);
   const money = new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -86,28 +40,53 @@
     currency: "USD",
     minimumFractionDigits: 2,
   });
+  const sourceMoney = (value) =>
+    Number.isInteger(value * 100)
+      ? exactMoney.format(value)
+      : `${String(value)} USD`;
   const state = {
     orders: [],
     asOf: "2026-11-17",
+    revision: 0,
+    source: "unavailable",
+    database: {},
+    integrations: {},
+    level: "overview",
     selectedId: null,
-    filters: { search: "", signal: "all", status: "all" },
+    filters: {
+      search: "",
+      signal: "all",
+      status: "all",
+      region: "",
+      category: "",
+      channel: "",
+    },
+    accessPhrase: "",
     history: [],
+    pending: null,
     submitting: false,
+    refreshing: false,
     storageAvailable: true,
-    dialogOrderId: null,
-    mode: "real",
-    receiver: null,
-    connecting: false,
-    verifying: new Set(),
   };
   let toastTimer;
 
-  // Build nodes with textContent; user-edited requests are never interpreted as HTML.
   function node(tag, className, text) {
     const element = document.createElement(tag);
     if (className) element.className = className;
-    if (text !== undefined) element.textContent = text;
+    if (text !== undefined) element.textContent = String(text);
     return element;
+  }
+  function text(selector, value) {
+    $(selector).textContent = String(value ?? "");
+  }
+  function net(order) {
+    return order.revenue - order.refund;
+  }
+  function profit(order) {
+    return net(order) - order.cost;
+  }
+  function margin(order) {
+    return net(order) === 0 ? null : profit(order) / net(order);
   }
   function dateLabel(iso) {
     return new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-GB", {
@@ -126,15 +105,6 @@
       }[status] || status
     );
   }
-  function net(order) {
-    return order.revenue - order.refund;
-  }
-  function profit(order) {
-    return net(order) - order.cost;
-  }
-  function margin(order) {
-    return net(order) === 0 ? null : profit(order) / net(order);
-  }
   function signals(order) {
     const list = [];
     if (profit(order) < 0) list.push("negative");
@@ -144,7 +114,45 @@
       list.push("refund");
     return list;
   }
+  function metrics(orders) {
+    const sum = (key) => orders.reduce((value, order) => value + order[key], 0);
+    const revenue = sum("revenue"),
+      refund = sum("refund"),
+      cost = sum("cost");
+    return {
+      count: orders.length,
+      revenue,
+      refund,
+      cost,
+      netRevenue: revenue - refund,
+      profit: revenue - refund - cost,
+      attention: orders.filter((order) => signals(order).length).length,
+    };
+  }
+  function currentScope() {
+    return Object.fromEntries(
+      Object.entries(state.filters)
+        .map(([key, value]) => [key, key === "search" ? value.trim() : value])
+        .filter(([, value]) => value && value !== "all"),
+    );
+  }
+  function scopeLabel(scope = currentScope()) {
+    if (!scope || typeof scope !== "object") scope = {};
+    const parts = [];
+    if (scope.region) parts.push(scope.region);
+    if (scope.category) parts.push(scope.category);
+    if (scope.channel) parts.push(scope.channel);
+    if (scope.status) parts.push(describeStatus(scope.status));
+    if (scope.signal)
+      parts.push(
+        SIGNALS[scope.signal]?.label ||
+          (scope.signal === "attention" ? "Needs attention" : "No signals"),
+      );
+    if (scope.search) parts.push(`Search: ${scope.search}`);
+    return parts.join(" · ") || "All orders";
+  }
   function visibleOrders() {
+    const f = state.filters;
     return state.orders.filter((order) => {
       const search = [
         order.id,
@@ -158,17 +166,22 @@
         .toLowerCase();
       const flags = signals(order);
       const signalMatch =
-        state.filters.signal === "all" ||
-        (state.filters.signal === "attention" && flags.length > 0) ||
-        (state.filters.signal === "clear" && flags.length === 0) ||
-        flags.includes(state.filters.signal);
+        f.signal === "all" ||
+        (f.signal === "attention" && flags.length) ||
+        (f.signal === "clear" && !flags.length) ||
+        flags.includes(f.signal);
       return (
-        search.includes(state.filters.search.toLowerCase()) &&
+        search.includes(f.search.trim().toLowerCase()) &&
         signalMatch &&
-        (state.filters.status === "all" ||
-          order.status === state.filters.status)
+        (f.status === "all" || order.status === f.status) &&
+        (!f.region || order.region === f.region) &&
+        (!f.category || order.category === f.category) &&
+        (!f.channel || order.channel === f.channel)
       );
     });
+  }
+  function selectedOrder() {
+    return state.orders.find((order) => order.id === state.selectedId);
   }
   function statusBadge(signal) {
     return node(
@@ -178,1005 +191,1433 @@
     );
   }
   function notify(message) {
-    clearTimeout(toastTimer);
-    $("#toast").textContent = message;
+    window.clearTimeout(toastTimer);
+    text("#toast", message);
     $("#toast").hidden = false;
-    toastTimer = setTimeout(() => {
+    toastTimer = window.setTimeout(() => {
       $("#toast").hidden = true;
-    }, 6000);
+    }, 6500);
   }
-  function setStorageWarning(message) {
-    const warning = $("#storage-warning");
-    warning.textContent = message;
-    warning.hidden = !message;
+  function setFormStatus(message, tone = "") {
+    text("#form-status", message);
+    $("#form-status").dataset.state = tone;
   }
-  function readHistory() {
+  function validOrder(order) {
+    return (
+      order &&
+      [
+        "id",
+        "product",
+        "category",
+        "region",
+        "channel",
+        "status",
+        "owner",
+        "note",
+        "orderDate",
+        "promisedDate",
+      ].every((key) => typeof order[key] === "string") &&
+      ["quantity", "revenue", "cost", "refund"].every(
+        (key) => Number.isFinite(order[key]) && order[key] >= 0,
+      )
+    );
+  }
+  async function api(body, timeout = 20000) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeout);
     try {
-      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-      if (!Array.isArray(saved)) throw new Error("Invalid history");
-      const valid = saved.filter(
-        (entry) =>
-          entry &&
-          typeof entry.id === "string" &&
-          typeof entry.orderId === "string" &&
-          typeof entry.title === "string" &&
-          typeof entry.reason === "string" &&
-          typeof entry.destination === "string" &&
-          typeof entry.createdAt === "string" &&
-          !Number.isNaN(Date.parse(entry.createdAt)) &&
-          ((entry.mode === "practice" &&
-            Object.hasOwn(RESULTS, entry.status)) ||
-            (entry.mode === "real" &&
-              Object.hasOwn(REAL_RESULTS, entry.status) &&
-              UUID.test(entry.id) &&
-              UUID.test(entry.receiverId))),
+      const response = await fetch(API, {
+        method: body ? "POST" : "GET",
+        cache: "no-store",
+        credentials: "same-origin",
+        signal: controller.signal,
+        headers: {
+          ...(body ? { "Content-Type": "application/json" } : {}),
+          ...(state.accessPhrase
+            ? { Authorization: `Bearer ${state.accessPhrase}` }
+            : {}),
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+      const data = await response.json();
+      if (!data || typeof data !== "object")
+        throw new Error("The server returned an invalid response.");
+      return { ok: response.ok, status: response.status, data };
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+  function serverMessage(data, fallback) {
+    const names = Array.isArray(data?.missing)
+      ? data.missing.filter(
+          (value) =>
+            typeof value === "string" && /^[A-Z][A-Z0-9_]+$/.test(value),
+        )
+      : [];
+    return `${typeof data?.message === "string" ? data.message : fallback}${names.length ? ` Missing settings: ${names.join(", ")}.` : ""}`;
+  }
+  function applyRecords(data) {
+    if (
+      Array.isArray(data.records) &&
+      data.records.length &&
+      data.records.every(validOrder) &&
+      new Set(data.records.map((order) => order.id)).size ===
+        data.records.length
+    ) {
+      state.orders = data.records;
+    } else if (validOrder(data.record)) {
+      state.orders = state.orders.map((order) =>
+        order.id === data.record.id ? data.record : order,
       );
-      state.history = valid.slice(0, MAX_HISTORY).map((entry) => ({
-        ...entry,
-        status:
-          entry.status === "processing"
-            ? "uncertain"
-            : entry.status === "sending"
-              ? "unknown"
-              : entry.status,
-      }));
-      // A reload interrupts a rehearsal; never silently convert it to success.
-      if (
-        valid.some((entry) => ["processing", "sending"].includes(entry.status))
-      ) {
-        saveHistory();
-        notify(
-          "An interrupted action has an unknown result. Verify any real receipt before sending again.",
+    } else return false;
+    if (data.revision !== undefined) state.revision = data.revision;
+    if (typeof data.source === "string") state.source = data.source;
+    if (typeof data.asOf === "string") state.asOf = data.asOf;
+    return true;
+  }
+  async function refreshData({ quiet = false } = {}) {
+    if (state.refreshing) return false;
+    state.refreshing = true;
+    $("#refresh-data").disabled = true;
+    if (!quiet)
+      text("#data-status", "Reading the current dataset from the server…");
+    try {
+      const result = await api();
+      if (!result.ok || !applyRecords(result.data))
+        throw new Error(
+          serverMessage(result.data, "The current dataset could not be read."),
         );
-      }
-    } catch {
-      state.history = [];
-      state.storageAvailable = false;
-      setStorageWarning(
-        "Browser storage is unavailable or the saved history could not be read. New practice requests will remain in memory only; export them before closing this page.",
+      state.database = result.data.database || {};
+      state.integrations = result.data.integrations || {};
+      text(
+        "#data-status",
+        `${state.orders.length} synthetic orders · ${state.source === "supabase" ? "read from Supabase" : "bundled starting dataset"}`,
       );
+      const names = ["email", "trello", "supabase", "github"].filter(
+        (key) => integration(key)?.configured,
+      );
+      text(
+        "#connection-status",
+        `${names.length} of 4 connections configured. Every action can be tried; the server reports missing settings. ${state.database.message || ""}`,
+      );
+      $("#load-error").hidden = true;
+      render();
+      return true;
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "The dataset could not be read.";
+      text("#data-status", "Server read unavailable · no fresh data claimed");
+      text(
+        "#load-error",
+        `${message} No values were changed. Refresh after checking the server connection.`,
+      );
+      $("#load-error").hidden = false;
+      if (!state.orders.length) {
+        // Keep the analytical base inspectable when previewing static files. It is
+        // explicitly labelled; execute still requires an authoritative server snapshot.
+        try {
+          const response = await fetch(
+            new URL("./data.json", document.baseURI),
+          );
+          const seed = await response.json();
+          if (Array.isArray(seed.orders) && seed.orders.every(validOrder)) {
+            state.orders = seed.orders;
+            state.asOf = seed.meta.asOf;
+            state.source = "offline";
+            render();
+            text(
+              "#data-status",
+              "Bundled dataset · server unavailable; no external action verified",
+            );
+          }
+        } catch {
+          /* The visible error already explains the unavailable source. */
+        }
+      }
+      return false;
+    } finally {
+      state.refreshing = false;
+      $("#refresh-data").disabled = false;
     }
   }
-  function saveHistory() {
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(state.history.slice(0, MAX_HISTORY)),
-      );
-      state.storageAvailable = true;
-      setStorageWarning("");
-    } catch {
-      state.storageAvailable = false;
-      setStorageWarning(
-        "This browser could not save the latest request. It remains in memory for this visit; export the JSON before closing or reloading.",
-      );
-    }
+  function integration(action) {
+    return (
+      state.integrations[action] ||
+      (action === "supabase" ? state.integrations.supa : undefined)
+    );
   }
 
-  function renderMetrics(orders) {
-    $("#metric-revenue").textContent = money.format(
-      orders.reduce((sum, order) => sum + net(order), 0),
+  function renderBreadcrumbs() {
+    const nav = $("#breadcrumbs");
+    nav.replaceChildren();
+    const overview = node(
+      "button",
+      state.level === "overview" ? "current" : "",
+      "01 · Overview",
     );
-    $("#metric-profit").textContent = money.format(
-      orders.reduce((sum, order) => sum + profit(order), 0),
-    );
-    $("#metric-orders").textContent = String(orders.length).padStart(2, "0");
-    $("#metric-attention").textContent = String(
-      orders.filter((order) => signals(order).length).length,
-    ).padStart(2, "0");
-    $("#metric-order-note").textContent =
-      orders.length === state.orders.length
-        ? "All channels and regions"
-        : `${state.orders.length} total · current filters applied`;
+    overview.type = "button";
+    overview.addEventListener("click", goOverview);
+    nav.append(overview);
+    if (state.level !== "overview") {
+      nav.append(node("span", "breadcrumb-separator", "/"));
+      const segment = node(
+        "button",
+        state.level === "segment" ? "current" : "",
+        `02 · ${scopeLabel()}`,
+      );
+      segment.type = "button";
+      segment.addEventListener("click", () => {
+        state.level = "segment";
+        state.selectedId = null;
+        render();
+        focusView();
+      });
+      nav.append(segment);
+    }
+    if (state.level === "record") {
+      nav.append(
+        node("span", "breadcrumb-separator", "/"),
+        node("span", "current", `03 · ${state.selectedId}`),
+      );
+    }
+    nav.querySelector(".current")?.setAttribute("aria-current", "page");
   }
-  function renderCharts(orders) {
-    const regions = [
-      ...new Set(state.orders.map((order) => order.region)),
-    ].sort();
-    const totals = regions.map((region) => ({
-      region,
+  function renderMetrics(orders) {
+    const totals = metrics(orders);
+    text("#metric-revenue", money.format(totals.netRevenue));
+    text("#metric-profit", money.format(totals.profit));
+    text("#metric-orders", String(totals.count).padStart(2, "0"));
+    text("#metric-attention", String(totals.attention).padStart(2, "0"));
+    text("#metric-order-note", `${state.orders.length} total · current scope`);
+    text(
+      "#scope-summary",
+      `${totals.count} ${totals.count === 1 ? "order" : "orders"} · ${scopeLabel()}`,
+    );
+    const chips = $("#scope-chips");
+    chips.replaceChildren();
+    Object.entries(currentScope()).forEach(([key, value]) => {
+      const button = node("button", "scope-chip", `${key}: ${value} ×`);
+      button.type = "button";
+      button.setAttribute("aria-label", `Remove ${key} filter ${value}`);
+      button.addEventListener("click", () => {
+        state.filters[key] = ["status", "signal"].includes(key) ? "all" : "";
+        syncFilters();
+        render();
+      });
+      chips.append(button);
+    });
+  }
+  function renderBreakdown(selector, orders, field, measure) {
+    const values = [...new Set(orders.map((order) => order[field]))].sort();
+    const totals = values.map((value) => ({
+      value,
       total: orders
-        .filter((order) => order.region === region)
-        .reduce((sum, order) => sum + net(order), 0),
+        .filter((order) => order[field] === value)
+        .reduce(
+          (sum, order) =>
+            sum + (measure === "profit" ? profit(order) : net(order)),
+          0,
+        ),
     }));
-    const max = Math.max(1, ...totals.map((item) => item.total));
-    $("#region-chart").replaceChildren(
-      ...totals.map(({ region, total }) => {
-        const row = node("div", "region-row");
-        row.setAttribute("role", "listitem");
-        const track = node("div", "bar-track");
+    const max = Math.max(1, ...totals.map((item) => Math.abs(item.total)));
+    $(selector).replaceChildren(
+      ...totals.map(({ value, total }) => {
+        const button = node("button", "region-row");
+        button.type = "button";
+        button.dataset.dimension = field;
+        button.dataset.value = value;
+        button.setAttribute(
+          "aria-label",
+          `Explore ${field} ${value}: ${money.format(total)}`,
+        );
+        const track = node("span", "bar-track"),
+          fill = node("span", `bar-fill${total < 0 ? " negative" : ""}`);
         track.setAttribute("aria-hidden", "true");
-        const fill = node("div", "bar-fill");
-        fill.style.width = `${Math.max(0, (total / max) * 100)}%`;
+        fill.style.width = `${Math.max(2, (Math.abs(total) / max) * 100)}%`;
         track.append(fill);
-        row.append(
-          node("span", "region-label", region),
+        button.append(
+          node("span", "region-label", value),
           track,
           node("span", "region-value", money.format(total)),
         );
-        return row;
+        button.addEventListener("click", () => drill(field, value));
+        return button;
       }),
     );
-    // Signal totals are based on the same filters as the revenue chart and KPIs.
+    if (!totals.length)
+      $(selector).append(node("p", "chart-note", "No records in this scope."));
+  }
+  function renderCharts(orders) {
+    renderBreakdown("#region-chart", orders, "region", "net");
+    renderBreakdown("#category-chart", orders, "category", "profit");
+    const dimension = !state.filters.category
+      ? "category"
+      : !state.filters.region
+        ? "region"
+        : "channel";
+    text(
+      "#segment-chart-title",
+      `${dimension[0].toUpperCase() + dimension.slice(1)} breakdown · net revenue`,
+    );
+    renderBreakdown("#segment-chart", orders, dimension, "net");
     $("#signal-chart").replaceChildren(
       ...Object.entries(SIGNALS).map(([key, signal]) => {
-        const button = node("button", `signal-tile ${key}`);
-        button.type = "button";
-        button.setAttribute(
-          "aria-pressed",
-          String(state.filters.signal === key),
-        );
         const count = orders.filter((order) =>
           signals(order).includes(key),
         ).length;
+        const button = node("button", `signal-tile ${key}`);
+        button.type = "button";
         button.setAttribute(
           "aria-label",
-          `${signal.label}: ${count} orders in current view. Filter by this signal.`,
+          `${signal.label}: ${count} orders. Investigate this signal.`,
         );
         button.append(
           node("span", "", signal.label),
           node("strong", "", String(count).padStart(2, "0")),
         );
         button.addEventListener("click", () => {
-          state.filters.signal = state.filters.signal === key ? "all" : key;
-          $("#signal-filter").value = state.filters.signal;
-          renderWorkspace();
-          $(`#signal-chart .signal-tile.${key}`).focus({ preventScroll: true });
+          state.filters.signal = key;
+          state.level = "segment";
+          state.selectedId = null;
+          syncFilters();
+          render();
+          focusView();
         });
         return button;
       }),
     );
+    const featured = state.orders.find((order) => order.id === "NS-1041");
+    if (featured) {
+      text(
+        "#case-title",
+        `${featured.id} · ${money.format(profit(featured))} contribution`,
+      );
+      text(
+        "#case-summary",
+        `${featured.region} / ${featured.category}. Inspect the source cost and the classroom audit note before deciding what to change.`,
+      );
+    }
   }
   function renderOrders(orders) {
-    $("#order-count").textContent =
-      `${orders.length} ${orders.length === 1 ? "order" : "orders"}`;
+    text(
+      "#order-count",
+      `${orders.length} ${orders.length === 1 ? "order" : "orders"}`,
+    );
     $("#empty-orders").hidden = orders.length > 0;
     $("#orders-body").replaceChildren(
       ...orders.map((order) => {
-        const flags = signals(order);
         const row = node("tr");
         row.dataset.orderId = order.id;
         row.dataset.selected = String(state.selectedId === order.id);
-        const identity = node("td");
-        const button = node("button", "order-link", order.id);
-        button.type = "button";
-        button.setAttribute(
+        const identity = node("td"),
+          link = node("button", "order-link", order.id);
+        link.type = "button";
+        link.setAttribute(
           "aria-label",
           `Inspect order ${order.id}, ${order.product}`,
         );
-        button.setAttribute(
-          "aria-pressed",
-          String(state.selectedId === order.id),
-        );
-        button.addEventListener("click", () => selectOrder(order.id));
-        identity.append(button, node("span", "product-name", order.product));
-        const marginValue = margin(order);
-        const marginCell = node(
-          "td",
-          `money-cell ${profit(order) < 0 ? "margin-negative" : ""}`,
-          marginValue === null ? "—" : `${(marginValue * 100).toFixed(1)}%`,
-        );
-        const signalCell = node("td");
-        signalCell.append(statusBadge(flags[0]));
+        link.addEventListener("click", () => selectOrder(order.id));
+        identity.append(link, node("span", "product-name", order.product));
+        const value = margin(order),
+          flagCell = node("td"),
+          flags = signals(order);
+        flagCell.append(statusBadge(flags[0]));
         if (flags.length > 1)
-          signalCell.append(
-            node("span", "signal-extra", `+${flags.length - 1}`),
-          );
+          flagCell.append(node("span", "signal-extra", `+${flags.length - 1}`));
+        const detailsCell = node("td"),
+          details = node("button", "quiet-button", "Details →");
+        details.type = "button";
+        details.setAttribute(
+          "aria-label",
+          `View details and actions for ${order.id}`,
+        );
+        details.addEventListener("click", () => selectOrder(order.id));
+        detailsCell.append(details);
         row.append(
           identity,
           node("td", "money-cell", money.format(net(order))),
-          marginCell,
-          signalCell,
-          node("td", "table-arrow", "↗︎"),
+          node(
+            "td",
+            `money-cell ${profit(order) < 0 ? "margin-negative" : ""}`,
+            value === null ? "—" : `${(value * 100).toFixed(1)}%`,
+          ),
+          flagCell,
+          detailsCell,
         );
         row.addEventListener("click", (event) => {
-          if (!event.target.closest("button")) selectOrder(order.id);
+          if (!event.target.closest("button,a")) selectOrder(order.id);
         });
+        row.addEventListener("dblclick", () => selectOrder(order.id));
         return row;
       }),
     );
   }
-  function selectOrder(id) {
-    state.selectedId = id;
-    // Keep the clicked button mounted so keyboard focus remains on the selection.
-    document
-      .querySelectorAll("#orders-body tr[data-order-id]")
-      .forEach((row) => {
-        const selected = row.dataset.orderId === id;
-        row.dataset.selected = String(selected);
-        row
-          .querySelector("button")
-          .setAttribute("aria-pressed", String(selected));
-      });
-    renderDetail();
-  }
   function renderDetail() {
-    const detail = $("#order-detail");
-    const order = state.orders.find((item) => item.id === state.selectedId);
+    const detail = $("#order-detail"),
+      order = selectedOrder();
     detail.replaceChildren();
-    if (!order) {
-      const empty = node("div", "empty-state");
-      empty.append(
-        node("h3", "", "No order selected"),
-        node(
-          "p",
-          "",
-          "Choose an order from the current results to review its context.",
-        ),
-      );
-      detail.append(empty);
-      return;
-    }
+    detail.hidden = state.level !== "record" || !order;
+    if (detail.hidden) return;
     const top = node("div", "detail-top");
     top.append(
-      node("span", "detail-kicker", "Selected order"),
+      node("span", "detail-kicker", "LEVEL 03 · SOURCE RECORD"),
       node("span", "detail-status", describeStatus(order.status)),
     );
-    const flagList = node("div", "detail-flags");
-    const flags = signals(order);
-    (flags.length ? flags : [null]).forEach((signal) =>
-      flagList.append(statusBadge(signal)),
+    const heading = node("h2", "", order.id);
+    heading.id = "record-title";
+    heading.tabIndex = -1;
+    const flags = node("div", "detail-flags");
+    (signals(order).length ? signals(order) : [null]).forEach((signal) =>
+      flags.append(statusBadge(signal)),
     );
-    const values = [
-      ["Net sales", exactMoney.format(net(order))],
-      ["Product cost", exactMoney.format(order.cost)],
-      ["Contribution", exactMoney.format(profit(order))],
-      ["Refund", exactMoney.format(order.refund)],
-      ["Region / channel", `${order.region} / ${order.channel}`],
-      ["Responsible team", order.owner],
-    ];
     const context = node("dl", "detail-context");
-    values.forEach(([label, value]) => {
+    [
+      ["Contribution", exactMoney.format(profit(order))],
+      ["Net sales", exactMoney.format(net(order))],
+      ["Region / category", `${order.region} / ${order.category}`],
+      ["Responsible team", order.owner],
+      ["Revision", String(order.revision ?? state.revision)],
+    ].forEach(([label, value]) => {
       const item = node("div");
       item.append(node("dt", "", label), node("dd", "", value));
       context.append(item);
     });
-    const delivery = order.deliveredDate
-      ? `Delivered ${dateLabel(order.deliveredDate)}.`
-      : `Not delivered as of ${dateLabel(state.asOf)}.`;
-    const description = node(
-      "p",
-      "detail-summary",
-      `Ordered ${dateLabel(order.orderDate)}. Promised ${dateLabel(order.promisedDate)}. ${delivery}`,
+    const values = node("table", "record-values");
+    const caption = node(
+      "caption",
+      "sr-only",
+      "Recorded source values and numeric correction actions",
     );
+    const head = node("thead"),
+      header = node("tr");
+    ["Source field", "Current value", "Action"].forEach((label) =>
+      header.append(node("th", "", label)),
+    );
+    head.append(header);
+    const body = node("tbody");
+    for (const [field, label] of [
+      ["revenue", "Revenue"],
+      ["cost", "Product cost"],
+      ["refund", "Refund"],
+    ]) {
+      const row = node("tr"),
+        control = node("td"),
+        button = node("button", "button secondary small", "Edit value");
+      button.type = "button";
+      button.setAttribute("aria-label", `Edit ${field} for ${order.id}`);
+      button.addEventListener("click", () => openAction("supabase", field));
+      control.append(button);
+      row.append(
+        node("th", "", label),
+        node("td", "money-cell", sourceMoney(order[field])),
+        control,
+      );
+      body.append(row);
+    }
+    values.append(caption, head, body);
     const note = node("div", "detail-note");
     note.append(
-      node("strong", "", "Operational context"),
-      document.createTextNode(order.note),
+      node("strong", "", "Source context / classroom audit"),
+      node("p", "", order.note),
     );
-    const action = node("button", "button primary", "Request a review");
-    action.type = "button";
-    action.append(node("span", "", "→"));
-    action.addEventListener("click", openReview);
+    const actions = node("div", "context-actions"),
+      edit = node("button", "button primary", "Edit values in Supabase →"),
+      issue = node(
+        "button",
+        "button secondary",
+        "Report source issue in GitHub ↗",
+      );
+    edit.type = "button";
+    edit.id = "edit-record";
+    edit.addEventListener("click", () => openAction("supabase"));
+    issue.type = "button";
+    issue.id = "github-record";
+    issue.addEventListener("click", () => openAction("github"));
+    actions.append(edit, issue);
     detail.append(
       top,
-      node("h2", "", order.id),
-      node(
-        "p",
-        "detail-product",
-        `${order.product} · ${order.quantity} ${order.quantity === 1 ? "unit" : "units"}`,
-      ),
-      flagList,
+      heading,
+      node("p", "detail-product", `${order.product} · ${order.quantity} units`),
+      flags,
       context,
-      description,
+      values,
       note,
-      action,
+      actions,
       node(
         "p",
         "detail-footnote",
-        state.mode === "real"
-          ? "Review first. Confirm to send one real event."
-          : "Review first. Confirm second. Practice only.",
+        "Saving changes a numeric source value. A GitHub issue records a follow-up; it does not change the data.",
       ),
     );
+    if (!visibleOrders().some((item) => item.id === order.id))
+      detail.append(
+        node(
+          "p",
+          "state-banner",
+          "This record no longer matches the current filters after its values changed. The KPIs reflect the remaining filtered records.",
+        ),
+      );
   }
-  function renderWorkspace() {
+  function render() {
     const orders = visibleOrders();
-    if (!orders.some((order) => order.id === state.selectedId))
-      state.selectedId = orders[0]?.id || null;
+    text(
+      "#view-level",
+      state.level === "overview"
+        ? "LEVEL 01 · OVERVIEW"
+        : state.level === "segment"
+          ? "LEVEL 02 · SEGMENT"
+          : "LEVEL 03 · RECORD",
+    );
+    text(
+      "#view-title",
+      state.level === "overview"
+        ? "Operations overview"
+        : state.level === "segment"
+          ? scopeLabel()
+          : `${state.selectedId} · record investigation`,
+    );
+    text("#snapshot-date", dateLabel(state.asOf));
+    $("#snapshot-date").dateTime = state.asOf;
+    $("#overview-view").hidden = state.level !== "overview";
+    $("#segment-view").hidden = state.level !== "segment";
+    $("#metrics").hidden = state.level !== "overview";
+    $("#workspace").hidden = state.level === "overview";
+    $("#orders-panel").hidden = state.level !== "segment";
+    $("#global-filters").hidden = state.level === "record";
+    $("#email-view").hidden = state.level !== "overview";
+    text(
+      "#download-csv",
+      state.level === "record"
+        ? "Download record CSV ↓"
+        : "Download scope CSV ↓",
+    );
+    for (const level of ["overview", "segment", "record"]) {
+      if (state.level === level)
+        $(`#nav-${level}`).setAttribute("aria-current", "page");
+      else $(`#nav-${level}`).removeAttribute("aria-current");
+    }
+    text("#segment-title", scopeLabel());
+    const totals = metrics(orders);
+    text(
+      "#segment-description",
+      `${totals.count} records · ${money.format(totals.netRevenue)} net revenue · ${money.format(totals.profit)} contribution. Open a record to inspect the source, or create a task carrying this scope.`,
+    );
+    renderBreadcrumbs();
     renderMetrics(orders);
     renderCharts(orders);
     renderOrders(orders);
     renderDetail();
   }
+  function syncFilters() {
+    $("#search").value = state.filters.search;
+    $("#signal-filter").value = state.filters.signal;
+    $("#status-filter").value = state.filters.status;
+  }
+  function focusView() {
+    $("#view-title").focus({ preventScroll: true });
+    $("#overview").scrollIntoView({ block: "start", behavior: "instant" });
+  }
+  function goOverview() {
+    state.level = "overview";
+    state.selectedId = null;
+    state.filters.region = "";
+    state.filters.category = "";
+    state.filters.channel = "";
+    render();
+    focusView();
+  }
+  function drill(field, value) {
+    state.filters[field] = value;
+    state.level = "segment";
+    state.selectedId = null;
+    render();
+    focusView();
+  }
+  function selectOrder(id) {
+    state.selectedId = id;
+    state.level = "record";
+    render();
+    $("#record-title")?.focus({ preventScroll: true });
+    $("#order-detail").scrollIntoView({
+      block: "nearest",
+      behavior: "instant",
+    });
+  }
+
+  function readHistory() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+      state.history = Array.isArray(saved)
+        ? saved
+            .filter(
+              (entry) =>
+                entry &&
+                UUID.test(entry.requestId || "") &&
+                Object.hasOwn(ACTION_NAMES, entry.action) &&
+                Object.hasOwn(RESULTS, entry.state) &&
+                typeof entry.createdAt === "string",
+            )
+            .slice(0, MAX_HISTORY)
+            .map((entry) =>
+              entry.state === "sending"
+                ? {
+                    ...entry,
+                    state: "unknown",
+                    message:
+                      "The page closed while this request was pending. Inspect the destination before considering another send.",
+                  }
+                : entry,
+            )
+        : [];
+      saveHistory();
+    } catch {
+      state.history = [];
+      state.storageAvailable = false;
+    }
+  }
+  function saveHistory() {
+    try {
+      localStorage.setItem(
+        HISTORY_KEY,
+        JSON.stringify(state.history.slice(0, MAX_HISTORY)),
+      );
+      state.storageAvailable = true;
+    } catch {
+      state.storageAvailable = false;
+    }
+    text(
+      "#storage-warning",
+      state.storageAvailable
+        ? ""
+        : "Local storage is unavailable. Export the request IDs before closing the page; do not repeat an uncertain action.",
+    );
+    $("#storage-warning").hidden = state.storageAvailable;
+  }
+  function safeProviderUrl(action, value) {
+    if (typeof value !== "string") return null;
+    try {
+      const url = new URL(value);
+      const hosts = {
+        email: ["resend.com"],
+        trello: ["trello.com", "www.trello.com"],
+        supabase: ["supabase.com"],
+        github: ["github.com", "www.github.com"],
+      };
+      return url.protocol === "https:" &&
+        !url.username &&
+        !url.password &&
+        hosts[action].includes(url.hostname)
+        ? url.href
+        : null;
+    } catch {
+      return null;
+    }
+  }
   function renderHistory() {
-    $("#nav-count").textContent = String(state.history.length);
+    text("#nav-count", state.history.length);
     $("#export-history").disabled = !state.history.length;
-    $("#reset-history").disabled = !state.history.length || state.submitting;
     const list = $("#history-list");
+    list.replaceChildren();
     if (!state.history.length) {
       const empty = node("div", "history-empty");
-      const icon = node("span", "empty-icon", "↗︎");
-      icon.setAttribute("aria-hidden", "true");
-      const copy = node("div");
-      copy.append(
-        node("h3", "", "Your first action starts with a record."),
+      empty.append(
+        node("span", "empty-icon", "↗"),
         node(
           "p",
           "",
-          "Connect your test inbox, select an order and review an action before sending.",
+          "No actions yet. Email a filtered view, assign a segment, or open a record to review a correction.",
         ),
       );
-      empty.append(icon, copy);
-      list.replaceChildren(empty);
+      list.append(empty);
       return;
     }
-    list.replaceChildren(
-      ...state.history.map((entry) => {
-        const baseResult = (entry.mode === "real" ? REAL_RESULTS : RESULTS)[
-          entry.status
-        ];
-        const duplicate =
-          entry.mode === "real" &&
-          entry.warning === "DUPLICATE_CAPTURES" &&
-          entry.captureCount > 1;
-        const result = duplicate
-          ? { ...baseResult, label: "Receipt verified · duplicates", icon: "!" }
-          : baseResult;
-        const row = node("article", "activity-row");
-        const icon = node(
-          "span",
-          `activity-icon ${duplicate ? "unknown" : entry.status}`,
-          result.icon,
+    state.history.forEach((entry) => {
+      const row = node("article", "activity-row"),
+        copy = node("div");
+      copy.append(
+        node("h3", "activity-title", ACTION_NAMES[entry.action]),
+        node(
+          "p",
+          "activity-meta",
+          `${entry.recordId || scopeLabel(entry.scope)} · ${entry.createdAt}`,
+        ),
+        node(
+          "p",
+          "activity-description",
+          entry.message ||
+            "Keep this request ID and inspect the provider result.",
+        ),
+      );
+      const evidence = node("details", "activity-request");
+      evidence.append(
+        node("summary", "", "Request and evidence"),
+        node("p", "activity-ref", `Request ID: ${entry.requestId}`),
+      );
+      if (entry.providerId !== undefined)
+        evidence.append(
+          node("p", "activity-ref", `Provider ID: ${entry.providerId}`),
         );
-        icon.setAttribute("aria-hidden", "true");
-        const copy = node("div");
-        copy.append(
-          node("h3", "activity-title", entry.title),
+      if (entry.change)
+        evidence.append(
           node(
             "p",
-            "activity-meta",
-            `${entry.mode === "real" ? "LIVE EVENT" : "LOCAL PRACTICE"} · ${entry.orderId} → ${entry.destination}`,
+            "",
+            `${entry.change.field}: ${exactMoney.format(entry.change.expectedValue)} → ${exactMoney.format(entry.change.newValue)} · ${entry.change.reason}`,
           ),
-          node("p", "activity-description", result.detail),
-          ...(entry.message ? [node("p", "activity-meta", entry.message)] : []),
         );
-        const request = node("details", "activity-request");
-        request.append(
-          node("summary", "", "View the saved request"),
-          node("p", "", entry.reason),
+      if (entry.snapshot)
+        evidence.append(
           node(
             "p",
             "activity-ref",
-            `${entry.mode === "real" ? "Request ID" : "Local request"} ${entry.id}`,
+            `${entry.snapshot.recordIds?.length ?? "—"} records · ${scopeLabel(entry.scope)} · snapshot ${entry.snapshot.fingerprint || "not provided"}`,
           ),
         );
-        copy.append(request);
-        if (duplicate)
-          copy.append(
-            node(
-              "p",
-              "duplicate-warning",
-              `Duplicate delivery detected: ${entry.captureCount} captured events share this request ID. Do not resend; investigate the duplicate captures.`,
-            ),
-          );
-        if (entry.mode === "real") {
-          const links = node("div", "receipt-links");
-          const inbox = node("a", "text-link", "Open test inbox ↗︎");
-          inbox.href = viewerUrl(entry.receiverId);
-          inbox.target = "_blank";
-          inbox.rel = "noopener noreferrer";
-          links.append(inbox);
-          if (["received", "accepted", "unknown"].includes(entry.status)) {
-            const verify = node(
-              "button",
-              "button secondary small",
-              state.verifying.has(entry.id) ? "Checking…" : "Verify receipt",
-            );
-            verify.type = "button";
-            verify.disabled = state.verifying.has(entry.id);
-            verify.addEventListener("click", () => verifyReceipt(entry));
-            links.append(verify);
-          }
-          copy.append(links);
-          if (entry.captureId)
-            copy.append(
-              node("p", "activity-ref", `Captured request: ${entry.captureId}`),
-            );
-        }
-        const outcome = node(
-          "div",
-          `activity-result ${duplicate ? "unknown" : entry.status}`,
-          result.label,
+      if (entry.draft)
+        evidence.append(
+          node("pre", "proposal-diff", JSON.stringify(entry.draft, null, 2)),
         );
-        const time = node(
-          "time",
-          "",
-          new Date(entry.createdAt).toLocaleString("en-GB", {
-            day: "2-digit",
-            month: "short",
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-        );
-        time.dateTime = entry.createdAt;
-        outcome.append(time);
-        row.append(icon, copy, outcome);
-        return row;
-      }),
-    );
-  }
-  async function apiJson(path, payload) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 25000);
-    try {
-      const response = await fetch(path, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        signal: controller.signal,
-      });
-      let data;
-      try {
-        data = await response.json();
-      } catch {
-        throw new Error(
-          response.status === 404
-            ? "Live API routes are missing on this host. Deploy or open the standalone app to use live delivery."
-            : "The server did not return a readable result. Verify the receipt before sending again.",
-        );
+      copy.append(evidence);
+      const href = safeProviderUrl(entry.action, entry.url);
+      if (href) {
+        const link = node("a", "text-link", "Inspect provider result ↗");
+        link.href = href;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        copy.append(link);
       }
-      if (!data || typeof data !== "object")
-        throw new Error("The server returned an unreadable result.");
-      return { ...data, responseStatus: response.status };
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-  function errorMessage(data, fallback) {
-    return typeof data.message === "string"
-      ? data.message.slice(0, 250)
-      : typeof data.error === "string"
-        ? data.error.slice(0, 250)
-        : fallback;
-  }
-  function recordReceiptDetails(entry, result) {
-    if (
-      result.warning === "DUPLICATE_CAPTURES" &&
-      Number.isInteger(result.captureCount) &&
-      result.captureCount > 1
-    ) {
-      entry.warning = "DUPLICATE_CAPTURES";
-      entry.captureCount = Math.max(
-        entry.captureCount || 1,
-        result.captureCount,
-      );
-    }
-    entry.message = errorMessage(
-      result,
-      "The captured event matches this request ID.",
-    );
-  }
-  function receiverReady() {
-    return (
-      state.receiver &&
-      state.receiver.provider === "ntfy" &&
-      UUID.test(state.receiver.receiverId)
-    );
-  }
-  function readReceiver() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(RECEIVER_KEY) || "null");
-      if (saved && saved.provider === "ntfy" && UUID.test(saved.receiverId))
-        state.receiver = saved;
-    } catch {
-      /* Live setup remains available when local storage is blocked. */
-    }
-  }
-  function renderConnection() {
-    const real = state.mode === "real";
-    const ready = receiverReady();
-    $("#mode-badge").textContent = real
-      ? "Live test · real HTTP delivery"
-      : "Practice mode · no external sends";
-    $("#connection-description").textContent = real
-      ? "Create your own test inbox, send a reviewed synthetic event, and verify that ntfy.sh received it. No account or API key required."
-      : "Rehearse success, rejection and an uncertain result locally. Practice runs never contact the external service.";
-    $("#connect-receiver").hidden = !real;
-    $("#connect-receiver").disabled =
-      state.connecting || state.submitting || Boolean(ready);
-    $("#connect-receiver").textContent = state.connecting
-      ? "Connecting…"
-      : ready
-        ? "Inbox connected ✓"
-        : "Connect my test inbox →";
-    const status = $("#receiver-status");
-    status.replaceChildren();
-    if (!real)
-      status.append(
-        node(
-          "p",
-          "",
-          "Your live inbox is unchanged. Return to Live test when you want a real delivery.",
-        ),
-      );
-    else if (ready) {
-      const link = node("a", "text-link", "Open my test inbox ↗︎");
-      link.href = viewerUrl(state.receiver.receiverId);
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      status.append(
-        link,
-        node(
-          "p",
-          "",
-          "Connected · captured messages are retained for about 12 hours. Anyone with this topic URL can read or write test messages. Synthetic content only; use at most two live sends.",
-        ),
-      );
-    } else
-      status.append(
-        node(
-          "p",
-          "",
-          "Each student gets a unique test inbox. No account or API key. Use at most two live sends; practice mode covers repeated failure tests.",
-        ),
-      );
-    if ($("#action-dialog").open) updateReviewMode();
-  }
-  async function connectReceiver() {
-    if (state.connecting || state.submitting) return;
-    state.connecting = true;
-    renderConnection();
-    try {
-      const result = await apiJson("/api/receiver", {});
-      if (
-        result.state !== "ready" ||
-        result.provider !== "ntfy" ||
-        !UUID.test(result.receiverId)
-      ) {
-        throw new Error(
-          errorMessage(
-            result,
-            result.responseStatus === 429
-              ? "The server is temporarily rate limited. Wait briefly and try again; reuse your connected inbox when available."
-              : "The test inbox could not be connected. Try again or choose Practice mode.",
+      if (entry.state === "accepted")
+        copy.append(
+          node(
+            "p",
+            "state-banner",
+            "Provider acceptance does not prove inbox delivery. Check the recipient inbox; do not send the same summary again just to check it.",
           ),
         );
-      }
-      state.receiver = {
-        receiverId: result.receiverId,
-        provider: "ntfy",
-      };
-      try {
-        localStorage.setItem(RECEIVER_KEY, JSON.stringify(state.receiver));
-      } catch {
-        notify(
-          "Inbox connected for this visit. Browser storage is unavailable.",
+      if (["unknown", "rejected"].includes(entry.state) && !entry.retryable)
+        copy.append(
+          node(
+            "p",
+            "state-banner",
+            "Do not repeat this request. Inspect the provider first; a failed response may follow a partial external action.",
+          ),
         );
-      }
-      notify(
-        "Your real test inbox is connected. Review an order before sending an event.",
+      row.append(
+        node(
+          "span",
+          `activity-icon ${entry.state}`,
+          entry.state === "verified"
+            ? "✓"
+            : entry.state === "accepted"
+              ? "↗"
+              : "!",
+        ),
+        copy,
+        node("div", `activity-result ${entry.state}`, RESULTS[entry.state]),
       );
-    } catch (error) {
-      const message =
-        error instanceof Error && error.name !== "AbortError"
-          ? error.message
-          : "The inbox connection timed out. No order was sent. Try again later.";
-      $("#receiver-status").textContent = message;
-      $("#form-status").textContent = message;
-      notify(message);
-    } finally {
-      state.connecting = false;
-      // Keep a useful error message when connecting failed.
-      if (receiverReady()) renderConnection();
-      else {
-        $("#connect-receiver").disabled = false;
-        $("#connect-receiver").textContent = "Connect my test inbox →";
-        if ($("#action-dialog").open) updateReviewMode();
-      }
-    }
-  }
-  function updateReviewMode() {
-    const real = state.mode === "real";
-    const ready = receiverReady();
-    $("#dialog-title").textContent = real
-      ? "Review and send an event"
-      : "Prepare a practice request";
-    $("#dialog-description").textContent = real
-      ? "Check the synthetic order and edit the message. Confirming sends one real HTTP event to your personal ntfy.sh test inbox."
-      : "Check the context and edit the request. This is a local rehearsal; confirming will not contact any external service.";
-    $("#destination-label").textContent = real
-      ? "External destination"
-      : "Practice destination label";
-    $("#action-destination").readOnly = real;
-    $("#action-destination").value = real
-      ? ready
-        ? `https://ntfy.sh/ie-action-lab-${state.receiver.receiverId}`
-        : "Connect your test inbox before sending"
-      : "Practice · local action queue";
-    $("#destination-help").textContent = real
-      ? "Only the synthetic order and reviewed message are sent to this receiver. No email or GitHub ticket is created."
-      : "This label does not connect a service. Nothing is sent externally.";
-    $("#scenario-field").hidden = real;
-    $("#review-connect").hidden = !real || ready;
-    $("#review-connect-receiver").disabled = state.connecting;
-    $("#review-connect-receiver").textContent = state.connecting
-      ? "Connecting…"
-      : "Connect my test inbox";
-    $("#review-mode-label").textContent = real
-      ? "Live test · real external delivery"
-      : "Practice mode · no external sends";
-    $("#review-mode-description").textContent = real
-      ? "The event is sent to ntfy.sh, then its receipt is checked. Your history is stored in this browser."
-      : "Your simulated request and result are saved in this browser only.";
-    $("#confirm-action").textContent = real
-      ? "Send real test event →"
-      : "Confirm practice action →";
-    $("#confirm-action").disabled = state.submitting || (real && !ready);
-  }
-  async function verifyReceipt(entry, { quiet = false } = {}) {
-    if (entry.mode !== "real" || state.verifying.has(entry.id)) return;
-    let verifiedNow = false;
-    state.verifying.add(entry.id);
-    renderHistory();
-    try {
-      const result = await apiJson("/api/verify-event", {
-        receiverId: entry.receiverId,
-        requestId: entry.id,
-      });
-      if (
-        result.state === "received" &&
-        result.requestId === entry.id &&
-        CAPTURE_ID.test(result.captureId)
-      ) {
-        verifiedNow = true;
-        entry.status = "received";
-        entry.captureId = result.captureId;
-        entry.receivedAt = result.receivedAt || new Date().toISOString();
-        recordReceiptDetails(entry, result);
-      } else {
-        if (entry.status !== "received" && entry.status !== "accepted")
-          entry.status = "unknown";
-        entry.message = errorMessage(
-          result,
-          entry.status === "received"
-            ? "This event was verified earlier, but its capture is currently unavailable. Cached messages are retained for about 12 hours."
-            : "No matching captured receipt was verified yet. Use Verify receipt again; this button does not resend the event.",
-        );
-      }
-    } catch {
-      if (entry.status !== "received" && entry.status !== "accepted")
-        entry.status = "unknown";
-      entry.message =
-        "The receipt lookup failed. No event was resent. Check the inbox or verify again later.";
-    } finally {
-      state.verifying.delete(entry.id);
-      saveHistory();
-      renderHistory();
-      if (!quiet)
-        notify(
-          verifiedNow && entry.warning === "DUPLICATE_CAPTURES"
-            ? "Receipt verified, but duplicate captures were detected. Do not resend."
-            : verifiedNow
-              ? "A real captured receipt was verified."
-              : entry.status === "received"
-                ? "This delivery was verified earlier; its current cached receipt is unavailable. Nothing was resent."
-                : "Receipt not verified yet. Nothing was resent.",
-        );
-    }
-  }
-  async function confirmReal(event) {
-    event.preventDefault();
-    if (state.submitting || !state.dialogOrderId || !receiverReady()) return;
-    const title = $("#action-title"),
-      reason = $("#action-reason");
-    if (![title, reason].every(validateInput)) return;
-    if (!globalThis.crypto?.randomUUID) {
-      $("#form-status").textContent =
-        "Live delivery needs a secure HTTPS page or localhost to create a stable request ID.";
-      return;
-    }
-    state.submitting = true;
-    $("#confirm-action").disabled = true;
-    $("#cancel-action").disabled = true;
-    $("#close-dialog").disabled = true;
-    $("#delivery-mode").disabled = true;
-    $("#form-status").textContent =
-      "Sending one real event and checking its external receipt…";
-    const entry = {
-      id: crypto.randomUUID(),
-      mode: "real",
-      receiverId: state.receiver.receiverId,
-      orderId: state.dialogOrderId,
-      title: title.value.trim(),
-      reason: reason.value.trim(),
-      destination: "ntfy.sh · personal test inbox",
-      status: "sending",
-      createdAt: new Date().toISOString(),
-    };
-    state.history.unshift(entry);
-    state.history = state.history.slice(0, MAX_HISTORY);
-    saveHistory();
-    renderHistory();
-    try {
-      const result = await apiJson("/api/send-event", {
-        receiverId: entry.receiverId,
-        requestId: entry.id,
-        orderId: entry.orderId,
-        title: entry.title,
-        reason: entry.reason,
-      });
-      const matched = result.requestId === entry.id;
-      entry.status =
-        matched &&
-        ["received", "accepted", "unknown", "rejected"].includes(result.state)
-          ? result.state
-          : result.state === "invalid"
-            ? "rejected"
-            : "unknown";
-      if (entry.status === "received" && CAPTURE_ID.test(result.captureId))
-        entry.captureId = result.captureId;
-      else if (entry.status === "received") entry.status = "accepted";
-      if (result.httpStatus) entry.httpStatus = result.httpStatus;
-      entry.message = errorMessage(result, "");
-      if (entry.status === "received") recordReceiptDetails(entry, result);
-      if (["accepted", "unknown"].includes(entry.status)) {
-        // Allow the external message cache to settle; only read back, never resend.
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        await verifyReceipt(entry, { quiet: true });
-      }
-    } catch {
-      entry.status = "unknown";
-      entry.message =
-        "The send response was lost or unreadable. The event may exist. Verify the receipt before considering another send.";
-    } finally {
-      entry.completedAt = new Date().toISOString();
-      saveHistory();
-      state.submitting = false;
-      $("#cancel-action").disabled = false;
-      $("#close-dialog").disabled = false;
-      $("#delivery-mode").disabled = false;
-      closeReview();
-      renderConnection();
-      renderHistory();
-      notify(
-        entry.warning === "DUPLICATE_CAPTURES"
-          ? "Receipt verified, but duplicate captures were detected. Do not resend."
-          : `${REAL_RESULTS[entry.status].label}. ${entry.status === "received" ? "Open the inbox to inspect the real event." : "Check the activity record before taking another step."}`,
-      );
-      $("#history").scrollIntoView({ block: "nearest", behavior: "smooth" });
-    }
-  }
-  function openReview() {
-    if (state.submitting) return;
-    const order = state.orders.find((item) => item.id === state.selectedId);
-    if (!order) return;
-    state.dialogOrderId = order.id;
-    const flags = signals(order);
-    $("#action-form").reset();
-    ["#action-title", "#action-reason", "#action-destination"].forEach(
-      (selector) => $(selector).setCustomValidity(""),
-    );
-    $("#action-title").value =
-      `Review ${order.id}: ${flags.length ? flags.map((key) => SIGNALS[key].short.toLowerCase()).join(" / ") : "operational check"}`;
-    $("#action-reason").value =
-      `Please review ${order.id} (${order.product}). Net sales are ${exactMoney.format(net(order))}, contribution is ${exactMoney.format(profit(order))}, and refunds are ${exactMoney.format(order.refund)}. ${order.note}\n\nResponsible team: ${order.owner}. What should we verify before taking the next step?`;
-    const context = $("#review-context");
-    context.replaceChildren(
-      node("strong", "", `${order.id} · ${order.product}`),
-      node(
-        "span",
-        "",
-        `${order.region} / ${order.channel} · ${order.owner} · synthetic record`,
-      ),
-    );
-    $("#form-status").textContent = "";
-    $("#confirm-action").disabled = false;
-    $("#action-dialog").showModal();
-    updateReviewMode();
-    $("#action-title").focus();
-  }
-  function closeReview() {
-    if (state.submitting) return;
-    $("#action-dialog").close();
-    state.dialogOrderId = null;
-  }
-  function validateInput(element) {
-    element.setCustomValidity(
-      element.value.trim() ? "" : "Enter a value with more than spaces.",
-    );
-    return element.reportValidity();
-  }
-  async function confirmPractice(event) {
-    event.preventDefault();
-    if (state.submitting || !state.dialogOrderId) return;
-    const titleInput = $("#action-title"),
-      reasonInput = $("#action-reason"),
-      destinationInput = $("#action-destination");
-    if (![titleInput, reasonInput, destinationInput].every(validateInput))
-      return;
-    if (reasonInput.value.trim().length < 10) {
-      reasonInput.setCustomValidity(
-        "Explain the reason in at least 10 characters.",
-      );
-      reasonInput.reportValidity();
-      return;
-    }
-    const scenario = $("#action-scenario").value;
-    if (!["success", "rejected", "uncertain"].includes(scenario)) return;
-    state.submitting = true; // Set synchronously before any wait: repeated clicks cannot create another request.
-    $("#confirm-action").disabled = true;
-    $("#cancel-action").disabled = true;
-    $("#close-dialog").disabled = true;
-    $("#form-status").textContent =
-      "Running a local rehearsal… No external request is being made.";
-    const entry = {
-      id: `practice-${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`}`,
-      mode: "practice",
-      orderId: state.dialogOrderId,
-      title: titleInput.value.trim(),
-      reason: reasonInput.value.trim(),
-      destination: destinationInput.value.trim(),
-      status: "processing",
-      scenario,
-      createdAt: new Date().toISOString(),
-    };
-    state.history.unshift(entry);
-    state.history = state.history.slice(0, MAX_HISTORY);
-    saveHistory();
-    renderHistory();
-    await new Promise((resolve) => setTimeout(resolve, 700));
-    entry.status = scenario;
-    entry.completedAt = new Date().toISOString();
-    saveHistory();
-    state.submitting = false;
-    $("#cancel-action").disabled = false;
-    $("#close-dialog").disabled = false;
-    closeReview();
-    renderHistory();
-    notify(
-      `${RESULTS[scenario].label}. Saved ${state.storageAvailable ? "on this device" : "for this visit only"}; nothing was sent externally.`,
-    );
-    $("#history").scrollIntoView({
-      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        ? "auto"
-        : "smooth",
-      block: "nearest",
+      list.append(row);
     });
   }
   function exportHistory() {
-    const report = {
-      application: "Northstar Action Lab",
-      mode: "Live ntfy.sh deliveries and local simulations are labeled per request",
-      exportedAt: new Date().toISOString(),
-      dataAsOf: state.asOf,
-      requests: state.history,
-    };
-    const blob = new Blob([JSON.stringify(report, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const link = node("a");
+    const blob = new Blob(
+      [
+        JSON.stringify(
+          {
+            application: "Northstar Action Lab",
+            exportedAt: new Date().toISOString(),
+            dataSource: state.source,
+            actions: state.history,
+          },
+          null,
+          2,
+        ),
+      ],
+      { type: "application/json" },
+    );
+    const url = URL.createObjectURL(blob),
+      link = node("a");
     link.href = url;
     link.download = "northstar-action-history.json";
-    document.body.append(link);
     link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  function bindEvents() {
-    $("#delivery-mode").addEventListener("change", (event) => {
-      if (state.submitting) return;
-      state.mode = event.target.value === "practice" ? "practice" : "real";
-      renderConnection();
-      renderDetail();
-    });
-    $("#connect-receiver").addEventListener("click", connectReceiver);
-    $("#review-connect-receiver").addEventListener("click", connectReceiver);
-    $("#search").addEventListener("input", (event) => {
-      state.filters.search = event.target.value;
-      renderWorkspace();
-    });
-    $("#signal-filter").addEventListener("change", (event) => {
-      state.filters.signal = event.target.value;
-      renderWorkspace();
-    });
-    $("#status-filter").addEventListener("change", (event) => {
-      state.filters.status = event.target.value;
-      renderWorkspace();
-    });
-    $("#clear-filters").addEventListener("click", () => {
-      state.filters = { search: "", signal: "all", status: "all" };
-      $("#search").value = "";
-      $("#signal-filter").value = "all";
-      $("#status-filter").value = "all";
-      renderWorkspace();
-      $("#search").focus();
-    });
-    $("#action-form").addEventListener("submit", (event) =>
-      state.mode === "real" ? confirmReal(event) : confirmPractice(event),
-    );
-    ["#action-title", "#action-reason", "#action-destination"].forEach(
-      (selector) =>
-        $(selector).addEventListener("input", (event) =>
-          event.target.setCustomValidity(""),
-        ),
-    );
-    $("#close-dialog").addEventListener("click", closeReview);
-    $("#cancel-action").addEventListener("click", closeReview);
-    $("#action-dialog").addEventListener("cancel", (event) => {
-      if (state.submitting) event.preventDefault();
-    });
-    $("#export-history").addEventListener("click", exportHistory);
-    $("#reset-history").addEventListener("click", () => {
-      if (!state.submitting) {
-        // Native dialog returnValue survives reopening; Escape must never reuse
-        // a previous confirmed reset.
-        $("#reset-dialog").returnValue = "";
-        $("#reset-dialog").showModal();
-      }
-    });
-    $("#reset-dialog").addEventListener("close", () => {
-      if ($("#reset-dialog").returnValue !== "reset" || state.submitting)
-        return;
-      state.history = [];
-      saveHistory();
-      renderHistory();
-      notify(
-        "Local history cleared. Captured ntfy.sh events and your inbox are unchanged.",
-      );
-    });
+
+  function csvCell(value) {
+    let textValue = value === null || value === undefined ? "" : String(value);
+    // Keep text from becoming a spreadsheet formula when the export is opened.
+    if (typeof value === "string" && /^[\s]*[=+\-@]/.test(textValue))
+      textValue = `'${textValue}`;
+    return `"${textValue.replaceAll('"', '""')}"`;
   }
-  function validOrder(order) {
-    const stringFields = [
+  function downloadCsv() {
+    const records =
+      state.level === "record" && selectedOrder()
+        ? [selectedOrder()]
+        : visibleOrders();
+    const fields = [
       "id",
       "product",
       "category",
       "region",
       "channel",
-      "orderDate",
-      "promisedDate",
       "status",
-      "owner",
+      "quantity",
+      "revenue",
+      "cost",
+      "refund",
+      "netRevenue",
+      "contribution",
+      "marginRate",
+      "revision",
       "note",
     ];
-    return (
-      order &&
-      stringFields.every((key) => typeof order[key] === "string") &&
-      ["quantity", "revenue", "cost", "refund"].every(
-        (key) => Number.isFinite(order[key]) && order[key] >= 0,
-      ) &&
-      ["delivered", "in_transit", "processing"].includes(order.status) &&
-      /^\d{4}-\d{2}-\d{2}$/.test(order.orderDate) &&
-      /^\d{4}-\d{2}-\d{2}$/.test(order.promisedDate) &&
-      (order.deliveredDate === null ||
-        /^\d{4}-\d{2}-\d{2}$/.test(order.deliveredDate))
+    const lines = [
+      fields.map(csvCell).join(","),
+      ...records.map((order) => {
+        const row = {
+          ...order,
+          netRevenue: net(order),
+          contribution: profit(order),
+          marginRate: margin(order),
+        };
+        return fields.map((key) => csvCell(row[key])).join(",");
+      }),
+    ];
+    const blob = new Blob([`\uFEFF${lines.join("\r\n")}\r\n`], {
+      type: "text/csv;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob),
+      link = node("a");
+    link.href = url;
+    link.download = `northstar-${state.level === "record" ? state.selectedId : "current-scope"}-${state.asOf}.csv`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    notify(
+      `Downloaded ${records.length} ${records.length === 1 ? "record" : "records"} from the current ${state.level === "record" ? "record" : "filtered scope"}.`,
     );
+  }
+
+  function localDraft(action, scope, order) {
+    const totals = metrics(visibleOrders());
+    const summary = `Synthetic Northstar operations · ${state.asOf}\nScope: ${scopeLabel(scope)}\nOrders: ${totals.count}\nNet revenue: ${exactMoney.format(totals.netRevenue)}\nContribution: ${exactMoney.format(totals.profit)}\nRecords: ${visibleOrders()
+      .map((item) => item.id)
+      .join(", ")}`;
+    if (action === "email")
+      return {
+        to: "",
+        subject: `Operations summary · ${scopeLabel(scope)}`,
+        body: `${summary}\n\nPlease review this view and the records behind it.`,
+      };
+    if (action === "trello")
+      return {
+        title: `Investigate ${scopeLabel(scope)}`,
+        description: `${summary}\n\nInvestigate the selected segment and record the next step.`,
+      };
+    if (action === "github")
+      return {
+        title: `Investigate the source import for ${order.id}`,
+        body: `Synthetic source-record investigation: ${order.id} · ${order.product}\n\nCurrent revenue: ${exactMoney.format(order.revenue)}\nCurrent cost: ${exactMoney.format(order.cost)}\nCurrent refund: ${exactMoney.format(order.refund)}\nContribution: ${exactMoney.format(profit(order))}\n\nClassroom audit: ${order.note}\n\nCheck the source import so that a corrected value is not overwritten and the same error does not recur. Opening this issue does not change transaction data.`,
+      };
+    return {};
+  }
+  function setDraftFields(action, draft) {
+    $("#action-recipient").value = draft.to || "";
+    $("#action-title").value = draft.subject || draft.title || "";
+    $("#action-reason").value =
+      draft.body || draft.description || (action === "supabase" ? "" : "");
+  }
+  function draftFromFields(action) {
+    const title = $("#action-title").value.trim(),
+      body = $("#action-reason").value.trim();
+    if (action === "email")
+      return { to: $("#action-recipient").value.trim(), subject: title, body };
+    if (action === "trello") return { title, description: body };
+    if (action === "github") return { title, body };
+    return undefined;
+  }
+  function currentChange() {
+    const order = state.pending?.original;
+    if (!order) return null;
+    const field = $("#edit-field").value;
+    return {
+      field,
+      newValue: Number($("#edit-value").value),
+      expectedValue: order[field],
+      expectedRevision: order.revision ?? state.revision,
+      reason: $("#action-reason").value.trim(),
+    };
+  }
+  function renderCalculation() {
+    const original = state.pending?.original,
+      target = $("#calculation-preview");
+    target.replaceChildren();
+    if (!original) return;
+    const field = $("#edit-field").value,
+      raw = $("#edit-value").value,
+      value = Number(raw);
+    target.append(
+      node(
+        "p",
+        "",
+        `Current ${field}: ${sourceMoney(original[field])} · revision ${original.revision ?? state.revision}`,
+      ),
+    );
+    if (!raw || !Number.isFinite(value) || value < 0) return;
+    const changed = { ...original, [field]: value },
+      delta = profit(changed) - profit(original);
+    target.append(
+      node(
+        "p",
+        "",
+        `Contribution: ${exactMoney.format(profit(original))} → ${exactMoney.format(profit(changed))}`,
+      ),
+      node(
+        "p",
+        "metric-delta",
+        `Proposed change: ${delta >= 0 ? "+" : ""}${exactMoney.format(delta)}. This is a preview; no source value has been saved.`,
+      ),
+    );
+  }
+  function editableStage() {
+    $("#action-fields").hidden = false;
+    $("#exact-preview").hidden = true;
+    $("#back-to-edit").hidden = true;
+    $("#prepare-action").hidden = false;
+    $("#confirm-action").hidden = true;
+    $("#confirm-consent").checked = false;
+    if (state.pending) {
+      state.pending.reviewed = null;
+      state.pending.snapshot = null;
+    }
+  }
+  async function openAction(action, field = "cost") {
+    if (
+      state.submitting ||
+      state.pending ||
+      !Object.hasOwn(ACTION_NAMES, action)
+    )
+      return;
+    const order = selectedOrder();
+    if (["supabase", "github"].includes(action) && !order) {
+      notify("Open a record before taking this action.");
+      return;
+    }
+    const scope = currentScope();
+    const pending = {
+      action,
+      scope,
+      recordId: ["supabase", "github"].includes(action) ? order.id : undefined,
+      original: order ? { ...order } : null,
+      dirty: false,
+      preparing: false,
+      reviewed: null,
+      snapshot: null,
+    };
+    state.pending = pending;
+    editableStage();
+    setFormStatus("");
+    const numeric = action === "supabase";
+    text(
+      "#dialog-title",
+      {
+        email: "Email the current view",
+        trello: "Assign this segment in Trello",
+        supabase: `Correct ${order?.id} source values`,
+        github: `Report ${order?.id} in GitHub`,
+      }[action],
+    );
+    text(
+      "#dialog-description",
+      {
+        email:
+          "Edit the recipient, subject and message. The summary follows the filters in this view. Acceptance is not proof of inbox delivery.",
+        trello:
+          "Edit the task title and description. The selected segment and record IDs stay attached to the reviewed task.",
+        supabase:
+          "Choose one source value to correct. Review the old value, new value and contribution before a real database write. Only a verified read-back updates the dashboard.",
+        github:
+          "Edit an issue for this source record. Include the audit evidence and the follow-up that prevents the import error from recurring. An issue does not change source values.",
+      }[action],
+    );
+    text(
+      "#review-context",
+      `${pending.recordId ? `${pending.recordId} · ` : ""}${scopeLabel(scope)} · ${visibleOrders().length} records in scope`,
+    );
+    $("#recipient-field").hidden = action !== "email";
+    $("#action-recipient").disabled = action !== "email";
+    $("#action-recipient").required = action === "email";
+    $("#title-field").hidden = numeric;
+    $("#action-title").disabled = numeric;
+    $("#action-title").required = !numeric;
+    text("#title-label", action === "email" ? "Subject" : "Title");
+    text(
+      "#reason-label",
+      numeric
+        ? "Reason for this correction"
+        : action === "email"
+          ? "Email message"
+          : "Description / evidence",
+    );
+    $("#action-reason").minLength = numeric ? 5 : 10;
+    $("#action-reason").maxLength = numeric ? 600 : 8000;
+    $("#numeric-editor").hidden = !numeric;
+    $("#edit-field").disabled = !numeric;
+    $("#edit-value").disabled = !numeric;
+    $("#edit-value").required = numeric;
+    $("#dialog-access").value = state.accessPhrase;
+    $("#dialog-access-field").hidden = Boolean(state.accessPhrase);
+    setDraftFields(action, localDraft(action, scope, order));
+    if (numeric) {
+      $("#edit-field").value = field;
+      $("#edit-value").value = String(order[field]);
+      renderCalculation();
+    }
+    $("#action-dialog").returnValue = "";
+    $("#action-dialog").showModal();
+    if (numeric) return;
+    pending.preparing = true;
+    $("#prepare-action").disabled = true;
+    setFormStatus("Loading a draft from the current server data…");
+    try {
+      const result = await api({
+        operation: "preview",
+        action,
+        scope,
+        ...(pending.recordId ? { recordId: pending.recordId } : {}),
+      });
+      if (state.pending !== pending) return;
+      if (!result.ok || result.data.state !== "preview") {
+        setFormStatus(
+          serverMessage(
+            result.data,
+            "The server could not prepare this view. No action was sent.",
+          ),
+          "rejected",
+        );
+        return;
+      }
+      if (!pending.dirty) {
+        const defaults = result.data.defaults || {};
+        setDraftFields(action, defaults);
+      }
+      setFormStatus(
+        result.data.missing?.length
+          ? `You can review and try this action. Missing server settings: ${result.data.missing.join(", ")}.`
+          : "Draft prepared from the current scope. Edit it, then review the exact action.",
+      );
+    } catch {
+      if (state.pending === pending)
+        setFormStatus(
+          "The server preview is unavailable. No action was sent. You can edit the draft and try the review again.",
+          "rejected",
+        );
+    } finally {
+      if (state.pending === pending) {
+        pending.preparing = false;
+        $("#prepare-action").disabled = false;
+      }
+    }
+  }
+  function closeAction() {
+    if (state.submitting) return;
+    $("#action-dialog").close();
+    state.pending = null;
+  }
+  function reviewFingerprint(payload) {
+    return JSON.stringify({
+      action: payload.action,
+      scope: payload.scope,
+      recordId: payload.recordId,
+      draft: payload.draft,
+      change: payload.change,
+      snapshot: payload.snapshot?.fingerprint,
+    });
+  }
+  async function prepareAction(event) {
+    event.preventDefault();
+    const pending = state.pending;
+    if (!pending || pending.preparing || state.submitting) return;
+    const payload = {
+      operation: "preview",
+      action: pending.action,
+      scope: pending.scope,
+      ...(pending.recordId ? { recordId: pending.recordId } : {}),
+    };
+    if (pending.action === "supabase") {
+      const change = currentChange();
+      if (
+        !$("#edit-value").value ||
+        !Number.isFinite(change.newValue) ||
+        change.newValue < 0 ||
+        change.newValue === change.expectedValue
+      ) {
+        setFormStatus(
+          "Enter a different, valid numeric value before reviewing the correction.",
+          "rejected",
+        );
+        $("#edit-value").focus();
+        return;
+      }
+      payload.change = change;
+    } else payload.draft = draftFromFields(pending.action);
+    pending.preparing = true;
+    $("#prepare-action").disabled = true;
+    setFormStatus("Reading the current data and preparing the exact action…");
+    try {
+      const result = await api(payload);
+      if (state.pending !== pending) return;
+      if (
+        !result.ok ||
+        result.data.state !== "preview" ||
+        !result.data.snapshot?.fingerprint
+      ) {
+        setFormStatus(
+          serverMessage(
+            result.data,
+            "The server could not establish a preview. No action was sent.",
+          ),
+          "rejected",
+        );
+        if (result.status === 401) $("#dialog-access-field").hidden = false;
+        return;
+      }
+      const preview = result.data;
+      const reviewed = {
+        ...payload,
+        ...(pending.action === "supabase"
+          ? { change: preview.change }
+          : { draft: preview.defaults }),
+        snapshot: preview.snapshot,
+      };
+      const fingerprint = reviewFingerprint(reviewed);
+      const prior = state.history.find(
+        (entry) => entry.fingerprint === fingerprint && !entry.retryable,
+      );
+      if (prior) {
+        setFormStatus(
+          `This exact action already has a request: ${prior.requestId} (${RESULTS[prior.state]}). Inspect its activity entry before trying anything again.`,
+          "unknown",
+        );
+        return;
+      }
+      pending.reviewed = reviewed;
+      pending.snapshot = preview.snapshot;
+      pending.fingerprint = fingerprint;
+      $("#action-fields").hidden = true;
+      $("#exact-preview").hidden = false;
+      $("#prepare-action").hidden = true;
+      $("#back-to-edit").hidden = false;
+      $("#confirm-action").hidden = false;
+      $("#confirm-consent").checked = false;
+      $("#confirm-action").disabled = true;
+      text(
+        "#preview-title",
+        pending.action === "supabase"
+          ? `${pending.recordId} · numeric correction`
+          : preview.defaults.subject || preview.defaults.title,
+      );
+      text(
+        "#preview-destination",
+        `Destination: ${pending.action === "email" ? preview.defaults.to : preview.destination || "Checked by the server"}`,
+      );
+      const summary = `${preview.metrics.count} records · ${scopeLabel(preview.snapshot.scope)}\nNet revenue: ${exactMoney.format(preview.metrics.netRevenue)} · Contribution: ${exactMoney.format(preview.metrics.profit)}\nRecord IDs: ${preview.snapshot.recordIds.join(", ")}`;
+      text(
+        "#preview-body",
+        pending.action === "supabase"
+          ? `${summary}\n\nReason: ${preview.change.reason}`
+          : `${preview.defaults.body || preview.defaults.description}\n\n${preview.metadataNote || ""}`,
+      );
+      $("#preview-diff").hidden = pending.action !== "supabase";
+      if (pending.action === "supabase")
+        text(
+          "#preview-diff",
+          `${preview.change.field}\n− ${sourceMoney(preview.change.expectedValue)} (revision ${preview.change.expectedRevision})\n+ ${sourceMoney(preview.change.newValue)}\n\nSource amounts change only after a confirmed, verified save.`,
+        );
+      text(
+        "#confirm-action",
+        {
+          email: "Send this email →",
+          trello: "Create this Trello task →",
+          supabase: "Save correction to Supabase →",
+          github: "Create this GitHub issue →",
+        }[pending.action],
+      );
+      setFormStatus(
+        preview.missing?.length
+          ? `The action can be tried; the server will report missing settings: ${preview.missing.join(", ")}. No provider call has been made yet.`
+          : "Review the exact scope and content. Nothing is sent until you confirm.",
+      );
+    } catch {
+      if (state.pending === pending)
+        setFormStatus(
+          "The preview could not be loaded. No external action was requested. Try the preview again when the connection is available.",
+          "rejected",
+        );
+    } finally {
+      if (state.pending === pending) {
+        pending.preparing = false;
+        $("#prepare-action").disabled = false;
+      }
+    }
+  }
+  async function executeAction() {
+    const pending = state.pending;
+    if (
+      !pending?.reviewed ||
+      state.submitting ||
+      !$("#confirm-consent").checked
+    )
+      return;
+    state.submitting = true;
+    $("#confirm-action").disabled = true;
+    $("#back-to-edit").disabled = true;
+    $("#cancel-action").disabled = true;
+    $("#close-dialog").disabled = true;
+    const requestId = crypto.randomUUID();
+    const entry = {
+      action: pending.action,
+      requestId,
+      createdAt: new Date().toISOString(),
+      scope: pending.scope,
+      ...(pending.recordId ? { recordId: pending.recordId } : {}),
+      ...(pending.reviewed.draft ? { draft: pending.reviewed.draft } : {}),
+      ...(pending.reviewed.change ? { change: pending.reviewed.change } : {}),
+      snapshot: pending.snapshot,
+      fingerprint: pending.fingerprint,
+      state: "sending",
+      retryable: false,
+      message: "The confirmed action is in progress. Do not resend.",
+    };
+    state.history.unshift(entry);
+    state.history = state.history.slice(0, MAX_HISTORY);
+    saveHistory();
+    renderHistory();
+    setFormStatus(
+      `Request ${requestId} is in progress. Do not reload or resend.`,
+    );
+    let status = 0,
+      data;
+    try {
+      const result = await api(
+        {
+          ...pending.reviewed,
+          operation: "execute",
+          requestId,
+          confirmed: true,
+        },
+        60000,
+      );
+      status = result.status;
+      data = result.data;
+      if (data.requestId && data.requestId !== requestId)
+        data = {
+          state: "unknown",
+          message:
+            "The result did not match this request ID. Inspect the destination before another action.",
+        };
+    } catch {
+      data = {
+        state: "unknown",
+        message:
+          "The connection ended before the outcome was established. The action may already have occurred. Inspect the provider before sending anything again.",
+      };
+    }
+    entry.state = Object.hasOwn(RESULTS, data.state) ? data.state : "unknown";
+    entry.message = serverMessage(
+      data,
+      "The outcome could not be established. Inspect the provider using the request ID.",
+    );
+    entry.providerId =
+      data.id ?? data.emailId ?? data.cardId ?? data.issueNumber;
+    entry.url = data.url ?? data.cardUrl ?? data.issueUrl;
+    entry.retryable =
+      (status === 401 && data.state === "rejected") ||
+      (status === 503 && data.state === "not_configured");
+    if (data.deliveryState) entry.deliveryState = data.deliveryState;
+    if (data.checkedAt) entry.checkedAt = data.checkedAt;
+    if (data.verification) entry.verification = data.verification;
+    if (pending.action === "supabase" && data.state === "verified") {
+      const saved = data.record;
+      const savedInDataset = Array.isArray(data.records)
+        ? data.records.find((record) => record.id === pending.recordId)
+        : null;
+      if (
+        !validOrder(saved) ||
+        saved.id !== pending.recordId ||
+        saved[pending.reviewed.change.field] !==
+          pending.reviewed.change.newValue ||
+        !validOrder(savedInDataset) ||
+        savedInDataset[pending.reviewed.change.field] !==
+          pending.reviewed.change.newValue ||
+        data.records.length !== state.orders.length ||
+        !state.orders.every((record) =>
+          data.records.some((current) => current.id === record.id),
+        ) ||
+        !applyRecords(data)
+      ) {
+        entry.state = "unknown";
+        entry.message =
+          "The response did not establish the expected saved numeric value. Dashboard source values were not changed. Refresh from the server before another attempt.";
+      } else {
+        entry.message =
+          "The numeric correction was saved and independently read back from Supabase. All current KPIs and chart calculations now use the saved values.";
+        text(
+          "#data-status",
+          `${state.orders.length} synthetic orders · read from Supabase`,
+        );
+        render();
+      }
+    }
+    saveHistory();
+    renderHistory();
+    state.submitting = false;
+    $("#back-to-edit").disabled = false;
+    $("#cancel-action").disabled = false;
+    $("#close-dialog").disabled = false;
+    if (entry.retryable) {
+      editableStage();
+      setFormStatus(
+        `${entry.message} No external action was performed. Correct the settings or access phrase, then review again.`,
+        "rejected",
+      );
+      if (status === 401) {
+        $("#dialog-access-field").hidden = false;
+        $("#dialog-access").focus();
+      }
+    } else {
+      closeAction();
+      notify(
+        `${ACTION_NAMES[entry.action]}: ${RESULTS[entry.state]}. ${entry.state === "verified" ? "Evidence saved in Activity." : "Inspect the activity result before taking another step."}`,
+      );
+    }
+  }
+  function bindEvents() {
+    $("#nav-overview").addEventListener("click", (event) => {
+      event.preventDefault();
+      goOverview();
+    });
+    $("#nav-segment").addEventListener("click", () => {
+      state.level = "segment";
+      state.selectedId = null;
+      render();
+      focusView();
+    });
+    $("#nav-record").addEventListener("click", () => {
+      const order = selectedOrder() || visibleOrders()[0];
+      if (order) selectOrder(order.id);
+      else
+        notify(
+          "No records match this scope. Change the filters before opening a record.",
+        );
+    });
+    $("#download-csv").addEventListener("click", downloadCsv);
+    $("#search").addEventListener("input", (event) => {
+      state.filters.search = event.target.value;
+      render();
+    });
+    $("#signal-filter").addEventListener("change", (event) => {
+      state.filters.signal = event.target.value;
+      render();
+    });
+    $("#status-filter").addEventListener("change", (event) => {
+      state.filters.status = event.target.value;
+      render();
+    });
+    $("#clear-filters").addEventListener("click", () => {
+      state.filters = {
+        search: "",
+        signal: "all",
+        status: "all",
+        region: "",
+        category: "",
+        channel: "",
+      };
+      state.level = "overview";
+      state.selectedId = null;
+      syncFilters();
+      render();
+    });
+    $("#explore-case").addEventListener("click", () => {
+      const order = state.orders.find((item) => item.id === "NS-1041");
+      if (!order) return;
+      state.filters.region = order.region;
+      state.filters.category = order.category;
+      state.filters.search = "";
+      state.filters.signal = "all";
+      state.filters.status = "all";
+      state.level = "segment";
+      state.selectedId = null;
+      syncFilters();
+      render();
+      focusView();
+    });
+    $("#email-view").addEventListener("click", () => openAction("email"));
+    $("#trello-segment").addEventListener("click", () => openAction("trello"));
+    $("#lab-access").addEventListener("input", (event) => {
+      state.accessPhrase = event.target.value.trim();
+      $("#dialog-access").value = state.accessPhrase;
+    });
+    $("#dialog-access").addEventListener("input", (event) => {
+      state.accessPhrase = event.target.value.trim();
+      $("#lab-access").value = state.accessPhrase;
+    });
+    $("#clear-access").addEventListener("click", () => {
+      state.accessPhrase = "";
+      $("#lab-access").value = "";
+      $("#dialog-access").value = "";
+      notify("Lab access phrase cleared from memory.");
+    });
+    $("#refresh-data").addEventListener("click", () => refreshData());
+    ["#action-recipient", "#action-title", "#action-reason"].forEach(
+      (selector) =>
+        $(selector).addEventListener("input", () => {
+          if (state.pending) state.pending.dirty = true;
+        }),
+    );
+    $("#edit-field").addEventListener("change", () => {
+      if (!state.pending?.original) return;
+      $("#edit-value").value = String(
+        state.pending.original[$("#edit-field").value],
+      );
+      renderCalculation();
+    });
+    $("#edit-value").addEventListener("input", renderCalculation);
+    $("#action-form").addEventListener("submit", prepareAction);
+    $("#confirm-consent").addEventListener("change", () => {
+      $("#confirm-action").disabled =
+        !$("#confirm-consent").checked || state.submitting;
+    });
+    $("#confirm-action").addEventListener("click", executeAction);
+    $("#back-to-edit").addEventListener("click", () => {
+      if (!state.submitting) {
+        editableStage();
+        setFormStatus("Edit the request, then review it again.");
+      }
+    });
+    $("#cancel-action").addEventListener("click", closeAction);
+    $("#close-dialog").addEventListener("click", closeAction);
+    $("#action-dialog").addEventListener("cancel", (event) => {
+      if (state.submitting) event.preventDefault();
+    });
+    $("#action-dialog").addEventListener("close", () => {
+      if (!state.submitting) state.pending = null;
+    });
+    $("#export-history").addEventListener("click", exportHistory);
+    window.addEventListener("pagehide", () => {
+      state.accessPhrase = "";
+      $("#lab-access").value = "";
+      $("#dialog-access").value = "";
+    });
   }
   async function start() {
     bindEvents();
     readHistory();
-    readReceiver();
-    renderConnection();
     renderHistory();
-    try {
-      const response = await fetch(new URL("./data.json", document.baseURI));
-      if (!response.ok) throw new Error("Dataset request failed");
-      const data = await response.json();
-      if (
-        !Array.isArray(data.orders) ||
-        !data.orders.length ||
-        !data.orders.every(validOrder) ||
-        new Set(data.orders.map((order) => order.id)).size !==
-          data.orders.length ||
-        !/^\d{4}-\d{2}-\d{2}$/.test(data.meta?.asOf)
-      )
-        throw new Error("Invalid dataset");
-      state.orders = data.orders;
-      state.asOf = data.meta.asOf;
-      state.selectedId =
-        state.orders.find((order) => signals(order).includes("negative"))?.id ||
-        state.orders[0].id;
-      $("#snapshot-date").dateTime = state.asOf;
-      $("#snapshot-date").textContent = dateLabel(state.asOf);
-      renderWorkspace();
-    } catch {
-      const error = $("#load-error");
-      error.textContent =
-        "The bundled data could not be loaded. Reload this page. If you downloaded the copy, serve its folder with a local web server rather than opening the HTML file directly. See the workshop guide for the start command.";
-      error.hidden = false;
-      $("#order-count").textContent = "Data unavailable";
-    }
+    await refreshData();
   }
   start();
 })();

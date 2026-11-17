@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="An independent, synthetic operations dashboard for learning how to turn insights into reviewed actions."
+      content="Explore a three-level retail dashboard, investigate a segment and take reviewed actions from real data."
     />
     <meta name="color-scheme" content="light" />
     <title>Northstar · Action Lab</title>
@@ -19,121 +19,128 @@
         class="brand"
         href="./index.html"
         aria-label="Northstar Action Lab home"
-      >
-        <span class="brand-symbol" aria-hidden="true">✳︎</span>
-        <span
+        ><span class="brand-symbol" aria-hidden="true">✳︎</span
+        ><span
           >northstar<span class="brand-divider">/</span
           ><span class="brand-lab">action lab</span></span
-        >
-      </a>
+        ></a
+      >
       <nav class="top-nav" aria-label="Main navigation">
-        <a href="#overview" aria-current="page">Overview</a>
+        <button id="nav-overview" type="button" aria-current="page">
+          Overview
+        </button>
+        <button id="nav-segment" type="button">Segments</button>
+        <button id="nav-record" type="button">Record</button>
         <a href="#history"
           >Activity <span id="nav-count" class="nav-count">0</span></a
         >
-        <a href="./preflight.html">Four actions</a>
-        <a href="./start-here.html"
-          >Workshop guide <span aria-hidden="true">↗︎</span></a
-        >
+        <a href="./start-here.html">Guide ↗</a>
       </nav>
       <a
-        href="https://ie-lessons-tracker.vercel.app/apps-lab-starter.zip"
         class="button copy-button"
-        download
-        >Get your own copy <span aria-hidden="true">↓</span></a
+        href="https://github.com/josncmar/ie-apps-action-lab"
+        target="_blank"
+        rel="noopener noreferrer"
+        >Get your own copy ↗</a
       >
     </header>
-
-    <main id="main" class="page-shell">
-      <section class="hero" aria-labelledby="page-title">
-        <div class="hero-copy">
-          <p class="eyebrow">
-            <span class="line-dot"></span> IE DATA VISUALIZATION LAB
-            <span class="slash">/</span> SESSION 03
-          </p>
-          <h1 id="page-title">
-            See the signal.<br /><span>Take the next step.</span>
-          </h1>
-          <p class="hero-description">
-            Copy the template, deploy your own app and connect your services.
-            Complete Email → Supabase → Trello → GitHub in the four-action
-            panel.
-          </p>
-          <div class="hero-meta">
-            <span>Synthetic retail operations</span
-            ><span aria-hidden="true">·</span
-            ><span>Four exercises · easiest to hardest</span>
-          </div>
-          <div class="copy-links">
-            <a class="button primary" href="./preflight.html"
-              >Start the four exercises →</a
-            >
-          </div>
-          <div class="copy-links">
-            <a
-              href="https://github.com/josncmar/ie-apps-action-lab"
-              target="_blank"
-              rel="noopener noreferrer"
-              >View the source <span aria-hidden="true">↗︎</span></a
-            ><span aria-hidden="true">·</span
-            ><a
-              href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fjosncmar%2Fie-apps-action-lab"
-              target="_blank"
-              rel="noopener noreferrer"
-              >Deploy your own copy <span aria-hidden="true">↗︎</span></a
-            >
-          </div>
+    <main id="main" class="page-shell dashboard-shell">
+      <section class="lab-toolbar" aria-label="Data and connection settings">
+        <div class="data-status">
+          <span class="status-dot"></span
+          ><span id="data-status" role="status"
+            >Loading 24 synthetic orders…</span
+          >
         </div>
-        <aside
-          class="practice-card"
-          aria-label="Optional notification dashboard"
-        >
-          <div class="practice-label">
-            <span class="status-dot"></span
-            ><span id="mode-badge">Live test · real HTTP delivery</span>
+        <details id="connection-settings">
+          <summary>Connections &amp; lab access</summary>
+          <div class="toolbar-fields">
+            <label for="lab-access"
+              >Lab access phrase<input
+                id="lab-access"
+                type="password"
+                autocomplete="off"
+                placeholder="For configured service calls" /></label
+            ><button
+              id="refresh-data"
+              class="button secondary small"
+              type="button"
+            >
+              Refresh data &amp; connections ↻</button
+            ><button id="clear-access" class="quiet-button" type="button">
+              Clear phrase
+            </button>
           </div>
-          <h2>Optional notification dashboard</h2>
-          <p id="connection-description">
-            Create your own test inbox, send a reviewed synthetic event, and
-            verify that ntfy.sh received it. This optional ntfy demo needs no
-            account or API key.
+          <p class="small muted">
+            The phrase stays in memory. Provider keys belong on the server. You
+            can always try an action; missing settings return a clear error.
           </p>
-          <label class="mode-field"
-            >Delivery mode<select id="delivery-mode">
-              <option value="real">Live test · ntfy.sh</option>
-              <option value="practice">Practice · local simulation</option>
-            </select></label
-          >
-          <button id="connect-receiver" class="button primary" type="button">
-            Connect my test inbox <span aria-hidden="true">→</span>
-          </button>
-          <div
-            id="receiver-status"
-            class="receiver-status"
-            role="status"
-            aria-live="polite"
-          >
-            Each student gets their own unique test inbox. Synthetic data only.
-          </div>
-          <a class="text-link" href="./guide.html"
-            >How the ntfy notification works
-            <span aria-hidden="true">↗︎</span></a
-          >
-        </aside>
+          <p id="connection-status" class="small muted" role="status">
+            No connection check has completed.
+          </p>
+        </details>
       </section>
-
-      <section id="overview" class="overview" aria-labelledby="overview-title">
+      <nav
+        id="breadcrumbs"
+        class="breadcrumbs"
+        aria-label="Analysis breadcrumb"
+      ></nav>
+      <div id="load-error" class="load-error" role="alert" hidden></div>
+      <section id="overview" class="overview" aria-labelledby="view-title">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">THE WORKSPACE</p>
-            <h2 id="overview-title">Operations overview</h2>
+            <p id="view-level" class="eyebrow">LEVEL 01 · OVERVIEW</p>
+            <h2 id="view-title" tabindex="-1">Operations overview</h2>
           </div>
           <div class="date-chip">
-            <span aria-hidden="true">◷</span> Snapshot
+            Snapshot
             <time id="snapshot-date" datetime="2026-11-17">17 Nov 2026</time>
           </div>
         </div>
-        <div id="load-error" class="load-error" role="alert" hidden></div>
+        <div class="scope-toolbar">
+          <div>
+            <p id="scope-summary">All 24 orders</p>
+            <div id="scope-chips" class="scope-chips"></div>
+          </div>
+          <div class="scope-actions">
+            <button id="download-csv" class="button secondary" type="button">
+              Download CSV ↓</button
+            ><button id="email-view" class="button primary" type="button">
+              Email this view ↗
+            </button>
+          </div>
+        </div>
+        <div id="global-filters" class="filters global-filters">
+          <label class="search-field"
+            ><span class="sr-only">Search orders</span
+            ><span aria-hidden="true">⌕</span
+            ><input
+              id="search"
+              type="search"
+              placeholder="Search order, product or team…"
+              autocomplete="off" /></label
+          ><label class="filter-field"
+            ><span class="sr-only">Filter by signal</span
+            ><select id="signal-filter">
+              <option value="all">All signals</option>
+              <option value="attention">Needs attention</option>
+              <option value="negative">Negative contribution</option>
+              <option value="late">Late delivery</option>
+              <option value="refund">High refund</option>
+              <option value="clear">No signals</option>
+            </select></label
+          ><label class="filter-field"
+            ><span class="sr-only">Filter by delivery status</span
+            ><select id="status-filter">
+              <option value="all">All statuses</option>
+              <option value="delivered">Delivered</option>
+              <option value="in_transit">In transit</option>
+              <option value="processing">Processing</option>
+            </select></label
+          ><button id="clear-filters" class="quiet-button" type="button">
+            Reset filters
+          </button>
+        </div>
         <div id="metrics" class="metrics" aria-live="polite">
           <article class="metric">
             <p>Net revenue</p>
@@ -151,28 +158,60 @@
             ><span id="metric-order-note">All channels and regions</span>
           </article>
           <article class="metric metric-attention">
-            <p>Need a closer look <span aria-hidden="true">↗︎</span></p>
+            <p>Need a closer look ↗</p>
             <strong id="metric-attention">—</strong
             ><span>Orders with at least one signal</span>
           </article>
         </div>
-
-        <div class="chart-grid">
-          <section class="panel revenue-panel" aria-labelledby="region-title">
-            <div class="panel-heading">
-              <div>
-                <p class="eyebrow">PERFORMANCE</p>
-                <h3 id="region-title">Net revenue by region</h3>
-              </div>
-              <span class="chart-unit">USD · current filters</span>
+        <div id="overview-view">
+          <aside
+            class="segment-banner insight-callout"
+            aria-label="A record worth investigating"
+          >
+            <div>
+              <p class="eyebrow">A SIGNAL TO FOLLOW</p>
+              <h3 id="case-title">Follow the margin signal</h3>
+              <p id="case-summary">
+                Explore the Northeast / Workspace segment and inspect NS-1041.
+              </p>
             </div>
-            <div
-              id="region-chart"
-              class="region-chart"
-              role="list"
-              aria-label="Net revenue by region"
-            ></div>
-          </section>
+            <button id="explore-case" class="button secondary" type="button">
+              Investigate this segment →
+            </button>
+          </aside>
+          <div class="chart-grid">
+            <section class="panel revenue-panel" aria-labelledby="region-title">
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">DRILL INTO A REGION</p>
+                  <h3 id="region-title">Net revenue by region</h3>
+                </div>
+                <span class="chart-unit">Click a bar →</span>
+              </div>
+              <div
+                id="region-chart"
+                class="region-chart"
+                aria-label="Net revenue by region"
+              ></div>
+            </section>
+            <section
+              class="panel revenue-panel"
+              aria-labelledby="category-title"
+            >
+              <div class="panel-heading">
+                <div>
+                  <p class="eyebrow">DRILL INTO A CATEGORY</p>
+                  <h3 id="category-title">Contribution by category</h3>
+                </div>
+                <span class="chart-unit">Click a bar →</span>
+              </div>
+              <div
+                id="category-chart"
+                class="category-chart region-chart"
+                aria-label="Contribution by category"
+              ></div>
+            </section>
+          </div>
           <section class="panel signal-panel" aria-labelledby="signals-title">
             <div class="panel-heading">
               <div>
@@ -183,61 +222,52 @@
             </div>
             <div id="signal-chart" class="signal-chart"></div>
             <p class="chart-note">
-              An order can have more than one signal. A flag is a reason to
-              investigate, not a conclusion.
+              A flag is a reason to investigate, not a conclusion. Click a
+              signal to explore the underlying records.
             </p>
           </section>
         </div>
+        <div id="segment-view" hidden>
+          <section class="segment-banner" aria-labelledby="segment-title">
+            <div>
+              <p class="eyebrow">LEVEL 02 · DIAGNOSIS</p>
+              <h3 id="segment-title">Selected segment</h3>
+              <p id="segment-description"></p>
+            </div>
+            <button id="trello-segment" class="button primary" type="button">
+              Create a Trello task ↗
+            </button>
+          </section>
+          <section class="panel revenue-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">NARROW THE QUESTION</p>
+                <h3 id="segment-chart-title">Segment breakdown</h3>
+              </div>
+              <span class="chart-unit">Click to drill further →</span>
+            </div>
+            <div id="segment-chart" class="region-chart"></div>
+          </section>
+        </div>
       </section>
-
       <section
+        id="workspace"
         class="workspace-grid"
-        aria-label="Order explorer and selected order"
+        aria-label="Records in the current view"
       >
-        <div class="panel orders-panel">
+        <div id="orders-panel" class="panel orders-panel">
           <div class="panel-heading">
             <div>
-              <p class="eyebrow">FROM INSIGHT TO RECORD</p>
-              <h2>Order explorer</h2>
+              <p class="eyebrow">THE RECORDS BEHIND THIS VIEW</p>
+              <h2 id="orders-title">Order explorer</h2>
             </div>
             <span id="order-count" class="count-pill">24 orders</span>
-          </div>
-          <div class="filters">
-            <label class="search-field"
-              ><span class="sr-only">Search orders</span
-              ><span aria-hidden="true">⌕</span
-              ><input
-                id="search"
-                type="search"
-                placeholder="Search order, product or team…"
-                autocomplete="off"
-            /></label>
-            <label class="filter-field"
-              ><span class="sr-only">Filter by signal</span
-              ><select id="signal-filter">
-                <option value="all">All signals</option>
-                <option value="attention">Needs attention</option>
-                <option value="negative">Negative contribution</option>
-                <option value="late">Late delivery</option>
-                <option value="refund">High refund</option>
-                <option value="clear">No signals</option>
-              </select></label
-            >
-            <label class="filter-field"
-              ><span class="sr-only">Filter by delivery status</span
-              ><select id="status-filter">
-                <option value="all">All statuses</option>
-                <option value="delivered">Delivered</option>
-                <option value="in_transit">In transit</option>
-                <option value="processing">Processing</option>
-              </select></label
-            >
           </div>
           <div class="table-scroll">
             <table>
               <caption class="sr-only">
-                Synthetic orders. Select an order ID to inspect its context and
-                prepare a practice action.
+                Choose an order ID or its Details button to inspect source
+                values and contextual actions.
               </caption>
               <thead>
                 <tr>
@@ -253,32 +283,21 @@
             <div id="empty-orders" class="empty-state" hidden>
               <span aria-hidden="true">⌕</span>
               <h3>No orders match these filters</h3>
-              <p>Try another search or bring all orders back.</p>
-              <button id="clear-filters" class="button secondary" type="button">
-                Clear filters
-              </button>
+              <p>Change the filters or return to the overview.</p>
             </div>
           </div>
           <div class="table-footer">
-            <span>All records are fictional.</span
-            ><span
-              >Choose an order to continue
-              <span aria-hidden="true">→</span></span
-            >
+            <span>24 fictional source records. No customer data.</span
+            ><span>Click a row or use its Details button →</span>
           </div>
         </div>
         <aside
           id="order-detail"
           class="panel detail-panel"
-          aria-label="Selected order detail"
-          aria-live="polite"
-        >
-          <div class="empty-state">
-            <p>Select an order to inspect its context.</p>
-          </div>
-        </aside>
+          aria-label="Level 3 record detail"
+          hidden
+        ></aside>
       </section>
-
       <section
         id="history"
         class="panel history-panel"
@@ -289,9 +308,9 @@
             <p class="eyebrow">CLOSE THE LOOP</p>
             <h2 id="history-title">Action activity</h2>
             <p class="panel-description">
-              Real ntfy deliveries and local practice runs are labeled
-              separately. History stays on this device; external captured
-              messages are cached for about 12 hours.
+              Every request keeps its scope, values and evidence. Accepted,
+              verified and unknown results stay distinct. This activity list is
+              local; database values are read from the server.
             </p>
           </div>
           <div class="history-tools">
@@ -300,9 +319,7 @@
               class="button secondary small"
               type="button"
             >
-              Export JSON <span aria-hidden="true">↓</span></button
-            ><button id="reset-history" class="quiet-button" type="button">
-              Clear local history
+              Export JSON ↓
             </button>
           </div>
         </div>
@@ -314,76 +331,15 @@
         ></div>
         <div id="history-list"></div>
       </section>
-
-      <section class="workshop-panel" aria-labelledby="workshop-title">
-        <div class="workshop-intro">
-          <p class="eyebrow">YOUR WORK TODAY</p>
-          <h2 id="workshop-title">
-            One starting point.<br />Five steps forward.
-          </h2>
-          <p>
-            The dashboard, real test receiver, server routes and receipt check
-            are provided. Clone the app, change the action, and prove the new
-            behavior.
-          </p>
-          <a class="button light-button" href="./guide.html"
-            >Open the illustrated guide <span aria-hidden="true">↗︎</span></a
-          >
-        </div>
-        <nav class="workshop-steps" aria-label="Session 3 blocks">
-          <a href="./guide.html#block-1"
-            ><span class="step-index">01</span
-            ><span
-              ><strong>Define the action</strong
-              ><small>Choose the decision, actor and destination.</small></span
-            ><span aria-hidden="true">↗︎</span></a
-          >
-          <a href="./guide.html#block-2"
-            ><span class="step-index">02</span
-            ><span
-              ><strong>Review and remember</strong
-              ><small
-                >Customize the message and review it before sending.</small
-              ></span
-            ><span aria-hidden="true">↗︎</span></a
-          >
-          <a href="./guide.html#block-3"
-            ><span class="step-index">03</span
-            ><span
-              ><strong>Inspect the real connection</strong
-              ><small
-                >Inspect the captured event and adapt its payload.</small
-              ></span
-            ><span aria-hidden="true">↗︎</span></a
-          >
-          <a href="./guide.html#block-4"
-            ><span class="step-index">04</span
-            ><span
-              ><strong>Test the uncomfortable cases</strong
-              ><small>Check errors, repeated clicks and recovery.</small></span
-            ><span aria-hidden="true">↗︎</span></a
-          >
-          <a href="./guide.html#block-5"
-            ><span class="step-index">05</span
-            ><span
-              ><strong>Extend the workflow <em>Optional</em></strong
-              ><small>Choose one additional destination or change.</small></span
-            ><span aria-hidden="true">↗︎</span></a
-          >
-        </nav>
-      </section>
       <footer class="page-footer">
         <p>
-          <strong>Northstar</strong> is a fictional company. Every order in this
-          lab is synthetic.
+          <strong>Northstar</strong> is fictional. All 24 records are synthetic.
         </p>
         <a href="https://ie-lessons-tracker.vercel.app/course/3"
-          >Submit your work in the course portal
-          <span aria-hidden="true">↗︎</span></a
+          >Submit your work in the course portal ↗</a
         >
       </footer>
     </main>
-
     <dialog
       id="action-dialog"
       aria-labelledby="dialog-title"
@@ -401,107 +357,101 @@
             ×
           </button>
         </div>
-        <h2 id="dialog-title">Review and send an event</h2>
-        <p id="dialog-description">
-          Check the synthetic order and message. Confirming sends one real HTTP
-          event to your personal ntfy.sh test inbox.
-        </p>
+        <h2 id="dialog-title">Review this action</h2>
+        <p id="dialog-description"></p>
         <div id="review-context" class="review-context"></div>
-        <label class="form-field"
-          >Request title<input
-            id="action-title"
-            name="title"
-            required
-            maxlength="140"
-        /></label>
-        <label class="form-field"
-          >Reason for review<textarea
-            id="action-reason"
-            name="reason"
-            required
-            minlength="10"
-            maxlength="600"
-            rows="4"
-          ></textarea>
-        </label>
-        <label class="form-field"
-          ><span id="destination-label">Destination</span
-          ><input
-            id="action-destination"
-            name="destination"
-            required
-            maxlength="120"
-            value="ntfy.sh · connect your own test inbox"
-            readonly
-          /><small id="destination-help"
-            >Only the bundled synthetic order and reviewed message will be sent
-            to this inbox.</small
-          ></label
-        >
-        <label id="scenario-field" class="form-field" hidden
-          >Rehearsal scenario<select id="action-scenario" name="scenario">
-            <option value="success">
-              Success · simulate an accepted request
-            </option>
-            <option value="rejected">
-              Rejected · simulate a permission failure
-            </option>
-            <option value="uncertain">
-              Uncertain · simulate a lost response
-            </option>
-          </select></label
-        >
-        <div id="review-connect" class="review-connect">
-          <p>
-            Connect a test inbox before sending. Creating an inbox does not send
-            an order.
-          </p>
-          <button
-            id="review-connect-receiver"
-            class="button secondary"
-            type="button"
+        <div id="action-fields">
+          <label id="recipient-field" class="form-field" hidden
+            >Recipient email<input
+              id="action-recipient"
+              type="email"
+              maxlength="254"
+              placeholder="Your own email address"
+            /><small
+              >Use your own address for the free Resend test sender.</small
+            ></label
           >
-            Connect my test inbox
-          </button>
-        </div>
-        <div class="review-disclaimer">
-          <span class="status-dot"></span
-          ><span
-            ><strong id="review-mode-label"
-              >Live test · real external delivery</strong
-            ><br /><span id="review-mode-description"
-              >Your confirmed synthetic event is sent to ntfy.sh. The app checks
-              for its captured receipt.</span
-            ></span
+          <label id="title-field" class="form-field"
+            ><span id="title-label">Title</span
+            ><input id="action-title" maxlength="140"
+          /></label>
+          <label class="form-field"
+            ><span id="reason-label">Message</span
+            ><textarea
+              id="action-reason"
+              required
+              minlength="10"
+              maxlength="8000"
+              rows="5"
+            ></textarea>
+          </label>
+          <label id="dialog-access-field" class="form-field"
+            >Lab access phrase<input
+              id="dialog-access"
+              type="password"
+              autocomplete="off"
+              placeholder="Required when the connection is configured"
+            /><small
+              >Kept in memory only. This is not a provider API key.</small
+            ></label
           >
+          <div id="numeric-editor" class="numeric-editor" hidden>
+            <label class="numeric-field"
+              >Value to correct<select id="edit-field">
+                <option value="cost">Product cost</option>
+                <option value="revenue">Revenue</option>
+                <option value="refund">Refund</option>
+              </select></label
+            >
+            <label class="numeric-field"
+              >New value · USD<input
+                id="edit-value"
+                type="number"
+                min="0"
+                max="1000000000"
+                step="any"
+            /></label>
+            <div id="calculation-preview" class="calculation-preview"></div>
+          </div>
         </div>
-        <div id="form-status" role="status" aria-live="polite"></div>
+        <section id="exact-preview" class="exact-preview" hidden>
+          <p class="eyebrow">EXACT ACTION PREVIEW</p>
+          <h3 id="preview-title"></h3>
+          <p id="preview-destination" class="preview-destination"></p>
+          <pre id="preview-body"></pre>
+          <pre id="preview-diff" class="proposal-diff" hidden></pre>
+          <label class="confirmation-check"
+            ><input id="confirm-consent" type="checkbox" /><span
+              >I have reviewed the scope, destination and values. Run this
+              action once.</span
+            ></label
+          >
+        </section>
+        <div
+          id="form-status"
+          class="state-banner"
+          role="status"
+          aria-live="polite"
+        ></div>
         <div class="dialog-actions">
           <button id="cancel-action" type="button" class="button secondary">
             Cancel</button
-          ><button id="confirm-action" type="submit" class="button primary">
-            Send real test event <span aria-hidden="true">→</span>
-          </button>
-        </div>
-      </form>
-    </dialog>
-    <dialog
-      id="reset-dialog"
-      class="reset-dialog"
-      aria-labelledby="reset-title"
-    >
-      <form method="dialog">
-        <p class="eyebrow">THIS DEVICE ONLY</p>
-        <h2 id="reset-title">Clear your local action history?</h2>
-        <p>
-          This removes locally saved requests only. It does not delete captured
-          events at ntfy.sh or disconnect your test inbox. Export your history
-          first if you want to keep it.
-        </p>
-        <div class="dialog-actions">
-          <button class="button secondary" value="cancel">Keep history</button
-          ><button id="confirm-reset" class="button danger" value="reset">
-            Clear local history
+          ><button
+            id="back-to-edit"
+            type="button"
+            class="button secondary"
+            hidden
+          >
+            Edit request</button
+          ><button id="prepare-action" type="submit" class="button primary">
+            Review exact action →</button
+          ><button
+            id="confirm-action"
+            type="button"
+            class="button primary"
+            hidden
+          >
+            Confirm action →
           </button>
         </div>
       </form>

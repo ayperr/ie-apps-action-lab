@@ -1,125 +1,118 @@
-# Configuración para probar las cuatro acciones
+# Guía de conexiones · dashboard integrado
 
-Guía del profesor y de quien configure su propia copia. Las cuatro acciones ya están implementadas: **email → Supabase → Trello → GitHub**. El alumno copia, despliega, personaliza el diseño/caso y conecta sus cuentas; no construye cuatro APIs desde cero. El calentamiento de borradores de email y Teams va antes de los cuatro ejercicios.
+Las cuatro acciones ya están implementadas y se utilizan dentro del dashboard principal: **Overview → Segment → Record**. No hay que construir cuatro APIs ni abrir un panel separado. El alumno copia, despliega, personaliza el caso y conecta sus cuentas.
 
-Dedica los primeros **35 minutos** a copiar y personalizar, después **email 30 min**, **Supabase 35 min**, **Trello 30 min** y **GitHub 30 min**, más **10 min de descanso** y **10 min de cierre**: **180 minutos**. La interfaz, los datos y los botones funcionan al clonar. Se puede abrir el preview y confirmar: si faltan valores del proveedor, la app muestra las variables que hay que configurar y no llama al servicio.
+## Recorrido de la clase · 180 minutos
 
-Se puede usar un dataset de una clase anterior o el caso ficticio incluido. Si cambia el registro de acción, el asistente debe actualizar de forma coherente la interfaz, el registro y los previews del servidor, y el fixture/función de Supabase. Cambiar solo etiquetas no cambia lo que se envía. NS-1041 queda como alternativa preparada.
+- Copiar y personalizar: 35 min.
+- Overview → Email: 30 min.
+- Segment → Trello: 30 min.
+- Record → corrección numérica Supabase: 35 min.
+- Record → issue de GitHub: 30 min.
+- Descanso: 10 min. Cierre y demostración: 10 min.
 
-## Primero: comprobar las cuentas
+Se puede usar el dataset ficticio incluido o adaptar uno de una clase anterior con el asistente. Si cambia el caso, deben cambiar coherentemente la interfaz, el contexto y registros del servidor, y el seed/IDs permitidos de Supabase. Cambiar etiquetas no cambia lo que se envía. Un borrador de email/Teams puede servir como calentamiento opcional; no demuestra que se haya enviado nada.
 
-Revisa el plan y los límites de tus cuentas de Resend, Supabase, Trello, GitHub y Vercel antes del taller. Las pantallas de facturación de las cuentas usadas en las pruebas no se han inspeccionado: que una acción funcione no certifica un plan Free ni la cuota disponible. Usa los planes gratuitos cuando estén disponibles para tu cuenta.
+## Primero: tu copia y tu clave del laboratorio
 
-Usa únicamente cuentas, repositorios y destinos de prácticas propios, con datos ficticios.
+1. Despliega tu propia copia del repositorio y abre **su URL principal**.
+2. Personaliza el diseño/caso antes de añadir credenciales. La interfaz, datos y botones funcionan al clonar. Puedes abrir previews y confirmar; si faltan conexiones, el error nombra las variables que debes configurar.
+3. En **tu Vercel → proyecto → Settings → Environment Variables → Production**, guarda `LAB_ACCESS_KEY`: una contraseña aleatoria de **32–256 caracteres**, conservada también en tu gestor de contraseñas. Hazlo antes de añadir claves de proveedores.
+4. Añade las variables del servicio, guarda y entra en **Deployments → último despliegue → Redeploy**.
 
-## Configuración común en Vercel
+No hay un flag de activación. Para llamadas reales configuradas, escribe la contraseña del laboratorio en **Connections & lab access** o en el diálogo de la acción. Las API keys van directamente a Vercel o a los ajustes del proveedor, nunca al chat ni a archivos publicados. **Refresh data & connections** consulta los datos y conexiones actuales; no escribe ninguna corrección.
 
-En **tu proyecto de la app → Settings → Environment Variables → Production**, configura las variables de [.env.example](../.env.example) en el entorno que vas a probar y después entra en **Deployments → último despliegue → Redeploy**. Son variables del servidor: ninguna lleva el prefijo `NEXT_PUBLIC_`.
+Consulta tu plan y cuotas antes del taller. Las cuentas utilizadas no se han auditado mediante sus pantallas de facturación; una API que responde no acredita que el plan sea Free.
 
-| Variable | Valor |
-| --- | --- |
-| `LAB_ACCESS_KEY` | Antes de añadir credenciales de proveedores, guarda una contraseña aleatoria de al menos 32 caracteres en tu gestor de contraseñas y en Vercel. Protege las operaciones reales cuando el servicio está configurado. |
+## 1 · Overview: enviar el resumen de la vista por email
 
-No hay un flag de activación. Puedes pulsar los botones antes de configurar las conexiones: al confirmar, un error claro identifica las variables ausentes, por ejemplo `RESEND_API_KEY` y `LAB_EMAIL_TO`. Si están presentes pero tienen un formato inválido, indica qué ajustes revisar. Añade o corrige esos valores en Vercel, guarda, redespliega y vuelve a probar. Para operar con un proveedor ya configurado, introduce la contraseña en **Lab access phrase**.
+**En la app:** ajusta la vista y sus filtros, pulsa **Email this view** y edita **destinatario, asunto y mensaje**. Revisa el contexto y la vista previa exacta antes de confirmar.
 
-No pegues claves en el chat, archivos del repositorio o capturas. Introdúcelas directamente en Vercel. La clave del laboratorio controla este panel temporal; no equivale a un sistema completo de usuarios para producción.
-
-## Calentamiento · Abrir borradores en email y Teams
-
-No requiere una API key, pero sí un cliente de correo configurado o una cuenta de Teams existente con acceso permitido. Un enlace de Teams puede exigir iniciar sesión y respetar las restricciones del tenant de Microsoft.
-
-**Prueba que cuenta:** desde la app, abrir el compositor del cliente externo correcto con el destinatario y texto esperados, sin enviar. Preparar el texto o generar el enlace dentro de la app no demuestra que ese recorrido funciona. En Teams se comprueba el compositor real después del inicio de sesión; no se sustituye por una previsualización interna. Si el login bloquea la apertura, la comprobación sigue pendiente.
-
-**Resultado:** un borrador visible en la aplicación externa. No es un email ni un mensaje enviados; tampoco se afirma persistencia del borrador si no se ha comprobado.
-
-## 1 · Email: enviarte un mensaje real · 30 min
-
-1. En tu cuenta Resend Free, crea una API key de pruebas con **Full access**. La comprobación utiliza tanto el envío como `GET /emails/{id}`; una clave limitada a enviar puede permitir el envío y rechazar la consulta posterior.
-2. Configura `LAB_EMAIL_TO` con **la dirección asociada a tu propia cuenta Resend**. El remitente de prueba es `onboarding@resend.dev`; no permite enviar a cualquier compañero o destinatario real sin verificar un dominio.
+1. En [Resend → API Keys](https://resend.com/api-keys), crea una clave de prácticas con **Full access**: permite enviar y consultar después el resultado.
+2. Configura `LAB_EMAIL_TO` con la dirección asociada a tu propia cuenta Resend. El remitente incluido es `onboarding@resend.dev`.
+3. Guarda en Vercel y redespliega.
 
 | Variable | Valor |
 | --- | --- |
-| `RESEND_API_KEY` | API key Full access de tu cuenta de prácticas. |
-| `LAB_EMAIL_TO` | Tu dirección asociada a esa cuenta Resend. |
+| `RESEND_API_KEY` | Tu clave de prácticas Full access. |
+| `LAB_EMAIL_TO` | Tu propia dirección asociada a esa cuenta Resend. |
 
-**Prueba que cuenta:** confirmación del envío desde la app, ID real del mensaje, consulta de su estado y comprobación de tu bandeja. «Aceptado por Resend» no demuestra recepción. Las direcciones de simulación como `delivered@resend.dev` tampoco prueban que una persona recibió el correo.
+El destinatario es editable, pero la ruta de prueba actual solo autoriza la dirección configurada en `LAB_EMAIL_TO`. Enviar a otras personas requiere un dominio verificado y adaptar expresamente esa restricción.
 
-## 2 · Supabase: guardar una revisión · 35 min
+**Comprobación:** abre el email real en tu bandeja y compara los filtros, el resumen y el identificador. «Aceptado» por el proveedor no demuestra llegada al buzón. Un estado pendiente se consulta sin volver a enviar el mensaje.
 
-Esta conexión necesita una tabla y una función además de la URL. **La plantilla incluye los archivos; no crea el proyecto ni despliega la función automáticamente.** Prepara esta parte con el profesor o el asistente. El caso incluido guarda únicamente NS-1041.
+## 2 · Segment: convertir el diagnóstico en una tarea Trello
 
-1. Crea o selecciona **tu propio proyecto de prácticas** en [Supabase](https://supabase.com/dashboard). En **SQL Editor**, ejecuta una sola vez [supabase/setup.sql](../supabase/setup.sql). Crea la tabla `ie_action_lab_reviews`, con el registro ficticio y acceso restringido al servidor. No repitas el script si la tabla ya existe.
-2. Abre [supabase/writeback/index.ts](../supabase/writeback/index.ts) con tu asistente. El marcador `EXPECTED_ACCESS_KEY_SHA256` necesita la huella SHA-256 de **tu propia** `LAB_ACCESS_KEY` de al menos **32 caracteres**. El asistente o profesor debe calcularla mediante una herramienta local o acceso autorizado a tus ajustes. No pegues el secreto en el chat: solo su huella sustituye al marcador. No hay un botón incluido que automatice este paso.
-3. En **Edge Functions**, despliega el archivo con el nombre exacto **`ie-action-lab-writeback`**. La plantilla comprueba su propia clave: despliega con **Verify JWT desactivado** únicamente manteniendo intacta esa comprobación y con la huella configurada. El profesor o asistente debe revisar este paso. `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` se utilizan dentro del servidor de Supabase; la clave de servicio no se copia al navegador.
-4. Añade la URL de tu proyecto en Vercel y conserva la misma clave del laboratorio usada para la huella. Guarda y redespliega la app.
+**En la app:** selecciona una región/categoría en los gráficos o usa **Investigate this segment**. En el segmento, pulsa **Create a Trello task** y edita título y descripción. La tarea debe conservar el segmento, sus registros y el siguiente paso solicitado.
+
+1. Crea un tablero y una lista de prácticas propios.
+2. En [trello.com/apps/admin](https://trello.com/apps/admin), crea una app con **My app doesn't use Power-up capabilities**. Completa nombre, Workspace y emails.
+3. En **Trello Auth**, pulsa **Generate a new Trello Auth API key for this app**.
+4. Pulsa **Token**, revisa cuenta, permisos read/write y duración, y pulsa **Allow**.
+5. Para obtener la lista, abre una tarjeta temporal dentro de ella, añade `.json` al final de su URL y copia el valor de `idList`, sin comillas. No copies el ID de la tarjeta.
 
 | Variable en Vercel | Valor |
 | --- | --- |
-| `LAB_SUPABASE_URL` | URL de tu proyecto, como `https://TU_PROYECTO.supabase.co`, sin ruta ni barra final. |
-| `LAB_ACCESS_KEY` | La contraseña de al menos 32 caracteres cuya huella has configurado en la función. |
+| `TRELLO_API_KEY` | API key de la pestaña Trello Auth. |
+| `TRELLO_TOKEN` | Token mostrado después de Allow. |
+| `TRELLO_LIST_ID` | `idList` de tu lista de prácticas. |
 
-Petición para el asistente, con tu copia del repositorio abierta:
+Usa **Trello Auth**, no OAuth 2.0. No hacen falta Secret, Client ID, callback ni Allowed origins para este flujo manual. El token puede actuar sobre otros tableros accesibles de la cuenta; usa un destino de prácticas. [Autorización oficial](https://developer.atlassian.com/cloud/trello/guides/rest-api/authorization/).
 
-> Ayúdame a configurar mi propio Supabase con supabase/setup.sql y supabase/writeback/index.ts. Explícame qué pantalla abrir y qué archivo usar. Mantén la comprobación de acceso y prepara la huella de mi clave por un canal local o autorizado; no me pidas pegar secretos en el chat. Comprueba la tabla y la función desplegada. Si no tienes acceso al proyecto o a los ajustes, indícame la operación concreta que debo realizar. No des la conexión por terminada solo por guardar la URL.
+**Comprobación:** abre la tarjeta real y contrasta lista, título, descripción, segmento y registros. Una tarjeta creada no demuestra que el problema de datos se haya resuelto.
 
-**Ejercicio:** confirmar que la revisión del registro se guarda fuera del navegador.
+## 3 · Record: corregir una cifra real en Supabase
 
-**Comprobación:** recargar la app, introducir de nuevo la frase del laboratorio y pulsar **Read saved review again**. Deben reaparecer el estado, el ID de petición y la fecha guardados. Como comprobación independiente, abre `ie_action_lab_reviews` en **Table Editor** y localiza NS-1041. La clase del profesor también comprobó la escritura con una lectura SQL.
+**Caso incluido:** abre NS-1041 con **Details →**. Su nota de auditoría identifica **$240 de transporte duplicado**. Coste actual **1320**; coste corregido **1080**; contribución **−120 → +120**. No se marca simplemente «revisado»: cambia el número guardado y las métricas que dependen de él.
 
-## 3 · Trello: crear una tarea de revisión · 30 min
+### Preparación de tu propio proyecto
 
-1. Crea un tablero y una lista de prácticas en tu propio workspace Free. No incorpores a toda la clase a un mismo workspace: el plan Free admite hasta 10 colaboradores por workspace.
-2. Abre el [administrador de apps de Trello](https://trello.com/apps/admin), crea una app y elige **My app doesn't use Power-up capabilities**. Completa el nombre **IE Action Lab**, tu **Workspace** y los campos de **email** solicitados.
-3. Entra en la pestaña **Trello Auth** y pulsa **Generate a new Trello Auth API key for this app**. Guarda la API key directamente en Vercel como `TRELLO_API_KEY`.
-4. Pulsa **Token**. Comprueba la cuenta, los permisos **read y write** y la duración mostrada; después pulsa **Allow**. Guarda el token que aparece directamente en Vercel como `TRELLO_TOKEN`.
-5. Identifica la lista de destino: crea una tarjeta temporal en esa lista, ábrela y añade `.json` al final de su URL. Busca `idList` y copia su valor sin comillas como `TRELLO_LIST_ID`. Ese es el ID de la lista; no uses el ID de la tarjeta.
+Los archivos están incluidos; copiar la web no crea la tabla ni despliega la función automáticamente. Configura esta parte con el profesor o asistente.
 
-**La ruta es Trello Auth, no OAuth 2.0.** Solo necesitas la **API key** y el **Token**: este flujo manual no utiliza Secret, Client ID, callback ni Allowed origins. Si ya existe la app, empieza en su pestaña Trello Auth.
+1. Abre tu proyecto de prácticas en [Supabase](https://supabase.com/dashboard). En **SQL Editor**, ejecuta [supabase/orders-setup.sql](../supabase/orders-setup.sql). Crea **`public.ie_action_lab_order_values`** con las cifras de 24 registros, revisión inicial 0 y permisos solo de servidor. Volver a ejecutar el seed no sobrescribe correcciones existentes.
+2. Abre [supabase/orders/index.ts](../supabase/orders/index.ts). El marcador `EXPECTED_ACCESS_KEY_SHA256` debe sustituirse por la huella SHA-256 de tu propia `LAB_ACCESS_KEY` de 32–256 caracteres. El profesor/asistente debe calcularla mediante una herramienta local o acceso autorizado a los ajustes; no pegues la contraseña en el chat ni la publiques en el archivo.
+3. Despliega el archivo como Edge Function **`ie-action-lab-orders`**. Utiliza **Verify JWT desactivado** únicamente conservando la comprobación propia de acceso y con la huella configurada. `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` permanecen dentro del servidor de Supabase.
+4. Añade la URL del proyecto en Vercel, conserva la misma clave del laboratorio y redespliega la app.
 
-Para el taller es preferible una autorización de un día; si el enlace Token ofrece otra duración, revisa el permiso antes de aceptarlo y pide ayuda para cambiarlo. El token puede actuar sobre los tableros accesibles de la cuenta, aunque la app tenga una única lista configurada. Revócalo al terminar. [Documentación oficial de autorización](https://developer.atlassian.com/cloud/trello/guides/rest-api/authorization/).
+| Variable en Vercel | Valor |
+| --- | --- |
+| `LAB_SUPABASE_URL` | `https://TU_PROYECTO.supabase.co`, sin ruta ni barra final. |
+| `LAB_ACCESS_KEY` | La contraseña cuya huella configuraste en la función. |
+
+Petición útil para el asistente:
+
+> Con mi copia abierta, ayúdame a desplegar supabase/orders-setup.sql y supabase/orders/index.ts en mi propio proyecto. Explícame cada pantalla y conserva la autenticación y el control de revisiones. Prepara la huella de la clave por un canal local o autorizado, nunca pidiéndome secretos en el chat. Verifica que hay 24 registros y que el endpoint ie-action-lab-orders los lee. Si no tienes acceso, dime la operación concreta que debo hacer.
+
+### Ejercicio y comprobación
+
+En el registro, pulsa **Edit values in Supabase**. Elige **Product cost**, introduce **1080** y explica el transporte duplicado. Puedes corregir revenue, cost o refund; la cifra debe ser válida, no negativa, y el reembolso no puede superar los ingresos. Revisa el antes/después, confirma y observa cómo cambia la contribución.
+
+El servidor compara **valor anterior y revisión**. Si otra persona cambió el registro mientras lo revisabas, devuelve un conflicto y no pisa el cambio: refresca y vuelve a revisar. Después de escribir, consulta la base de datos de nuevo antes de confirmar el éxito.
+
+**Comprobación:** recarga la página, introduce otra vez la frase del laboratorio y pulsa **Refresh data & connections**. Abre NS-1041: debe conservar coste 1080 y contribución +120. Contrasta la fila en Supabase **Table Editor → ie_action_lab_order_values**, incluida su revisión. Con el caso original, el coste total baja 240 y la contribución total sube 240. El historial local del navegador no es prueba de persistencia.
+
+Esta función y tabla son nuevas. Los antiguos `setup.sql`, `writeback/index.ts`, `ie-action-lab-writeback` y `ie_action_lab_reviews` solo servían para estado de revisión y no se usan en este ejercicio.
+
+## 4 · Record: reportar el problema mediante un issue de GitHub
+
+**En la app:** con el registro abierto, pulsa **Report source issue in GitHub**. Edita título y descripción para explicar el cargo duplicado, la cifra anterior/corregida y qué debe revisar el proceso de importación. Se abre un **issue**, no una PR: no se crean ramas, commits ni se modifica código.
+
+1. Usa tu propia copia del repositorio. Abre [crear token de prácticas](https://github.com/settings/personal-access-tokens/new?name=IE%20Action%20Lab&expires_in=7&issues=write).
+2. Elige tu cuenta como **Resource owner**. En **Repository access**, marca **Only select repositories** y selecciona tu copia, aunque sea pública. **Public repositories** es solo lectura.
+3. En **Permissions → + junto a Repository**, añade **Issues → Read and write**. Metadata read-only se incluye automáticamente. Este ejercicio no necesita Contents ni Pull requests.
+4. Guarda el token y el nombre de tu repositorio en Vercel y redespliega.
 
 | Variable | Valor |
 | --- | --- |
-| `TRELLO_API_KEY` | API key generada en la pestaña Trello Auth. |
-| `TRELLO_TOKEN` | Token mostrado después de pulsar Allow. |
-| `TRELLO_LIST_ID` | ID de la lista propia donde puede crearse la tarjeta. |
+| `LAB_GITHUB_TOKEN` | Token restringido a tu copia, con Issues read/write. |
+| `LAB_GITHUB_REPOSITORY` | `TU-USUARIO/TU-REPOSITORIO`, sin la URL de GitHub. |
 
-**Prueba que cuenta:** crear desde el panel, recuperar la tarjeta y abrir su URL real para comprobar contenido y lista. Guardar la API key y el token solo prepara la conexión; no demuestra todavía que la creación funcione.
+**Comprobación:** abre el issue real y compara título, cuerpo, registro y evidencia. Reportarlo no corrige los datos por sí mismo ni garantiza que la importación se haya arreglado.
 
-## 4 · GitHub: proponer un cambio mediante una PR · 30 min
+## Evidencia y cierre
 
-1. Elige un repositorio propio de prácticas que contenga la plantilla y su archivo `classroom-fixtures/review-policy.json`. El archivo viene incluido; confirma que existe en la rama configurada.
-2. Abre [crear el token de prácticas en GitHub](https://github.com/settings/personal-access-tokens/new?name=IE%20Action%20Lab&expires_in=7&contents=write&pull_requests=write). El enlace preselecciona el nombre, una caducidad de siete días y los dos permisos. En **Resource owner**, elige tu propia cuenta.
-3. En **Repository access**, marca **Only select repositories** y selecciona tu propia copia de la plantilla, aunque sea pública. **Public repositories** solo permite lectura y no sirve para crear esta PR.
-4. En **Permissions**, pulsa el **+ junto a Repository**, no el de Account. Añade o comprueba **Contents → Read and write** y **Pull requests → Read and write**. **Metadata: Read-only** se incluye automáticamente; no necesitas permisos de administración.
-5. Genera el token y guárdalo directamente en Vercel como `LAB_GITHUB_TOKEN`. Configura también el nombre de tu propio repositorio y redespliega antes de probar.
+**La verificación del nuevo recorrido integrado está pendiente de observar sus resultados reales.** Los envíos, tarjetas, PR y cambios de estado probados en el panel anterior no validan este flujo ni la nueva corrección numérica. No reutilices capturas antiguas como prueba del caso nuevo. Cada alumno debe configurar y comprobar su copia.
 
-| Variable | Valor |
-| --- | --- |
-| `LAB_GITHUB_TOKEN` | Token restringido a tu propia copia, seleccionada con Only select repositories. |
-| `LAB_GITHUB_REPOSITORY` | `TU-USUARIO/TU-REPOSITORIO`. |
-| `LAB_GITHUB_BASE_BRANCH` | `main`, si es la rama que contiene la plantilla. |
-| `LAB_GITHUB_POLICY_PATH` | `classroom-fixtures/review-policy.json`. |
+Guarda la evidencia de los cuatro puntos: email de la vista, tarjeta del segmento, cifra persistida con métricas recalculadas e issue del registro. Ante un resultado desconocido, comprueba el destino antes de repetir; ante un conflicto numérico, refresca primero. Al terminar, borra la frase del navegador y revoca los tokens temporales que ya no necesites.
 
-**Prueba que cuenta:** revisar la propuesta, crear rama/commit/PR desde el panel y abrir la URL real para verificar el diff del archivo de prácticas. La PR propone un cambio; no se fusiona automáticamente. El archivo de política es didáctico: modificarlo todavía no cambia por sí solo las reglas del dashboard. Tener el token configurado todavía no demuestra que la prueba de tu propia copia haya funcionado.
-
-## Ejecutar y cerrar la comprobación
-
-Tras configurar y redesplegar, abre **`/preflight.html` en tu propia app**. Introduce allí la clave del laboratorio, comprueba la configuración y confirma cada acción de prueba por separado. Sigue **email → Supabase → Trello → GitHub**. Revisa cada destino antes de confirmar: los cuatro ejercicios producen cambios fuera del navegador. Check configured services solo comprueba la configuración; no ejecuta acciones.
-
-Guarda URLs e identificadores de los resultados, sus comprobaciones y cualquier error, sin credenciales. Si aparece un resultado incierto, inspecciona el destino antes de repetir para evitar duplicados. Al terminar, borra la frase del laboratorio del campo de la página y revoca los tokens temporales que ya no necesites. Las operaciones con proveedores configurados siguen protegidas por la contraseña del laboratorio.
-
-## Evidencia de las pruebas reales
-
-El **17 de noviembre de 2026** se comprobaron las cuatro acciones en la app configurada del profesor:
-
-| Acción | Comprobación realizada |
-| --- | --- |
-| Email | Estado del proveedor y recepción confirmada en la bandeja del destinatario. |
-| Supabase | Escritura y lectura independiente del registro mediante SQL. |
-| Trello | Creación, lectura y comprobación de la [tarjeta N3nb8mnq](https://trello.com/c/N3nb8mnq). |
-| GitHub | Creación y verificación desde la interfaz de la [PR #1](https://github.com/josncmar/ie-apps-action-lab/pull/1). |
-
-Esto valida esa configuración del profesor, no las cuentas de cada alumno ni sus planes. Cada copia debe comprobar sus propios resultados. El calentamiento de borradores depende además del cliente externo de cada persona.
-
-La notificación **ntfy** del dashboard queda como **demostración extra opcional**. No forma parte de los cuatro ejercicios y su recepción no valida email, Supabase, Trello ni GitHub. Su modo de práctica es simulación local.
+La demo ntfy y los borradores de email/Teams quedan como extras opcionales; no son el recorrido principal ni prueban estas cuatro acciones.

@@ -1,94 +1,82 @@
 # Northstar · Action Lab
 
-A working app with four actions already implemented: **email → Supabase → Trello → GitHub**. Copy it, deploy your own version, personalize the interface and business case, connect your own accounts, then verify the real results. You do not build four APIs from scratch.
+A working dashboard with actions in context: **Overview → Segment → Record**. Email the current view, turn a segment into a Trello task, correct a real numeric value in Supabase, and report its source problem as a GitHub **issue**.
 
-The dashboard, 24 fictional orders, previews, confirmation and external verification are supplied. The interface, data and action buttons work immediately after cloning. You can preview and confirm an action; if its connection is missing, the app explains which server settings to add instead of contacting the provider. No previous class project is required.
+The four integrations, editable messages, previews, confirmation and verification are implemented. Copy the app, personalize it, connect your own accounts and check the results. You do not build four APIs from scratch or move to a separate action panel.
 
-[Open the action panel](https://ie-apps-action-lab.vercel.app/preflight.html) · [Simple learner guide](https://ie-apps-action-lab.vercel.app/start-here.html) · [Dashboard](https://ie-apps-action-lab.vercel.app)
+[Open the dashboard](https://ie-apps-action-lab.vercel.app/) · [Simple guide](https://ie-apps-action-lab.vercel.app/start-here.html) · [Instructor setup](reference/FOUR-ACTIONS.md)
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fjosncmar%2Fie-apps-action-lab)
 
-## Start with your own app · 35 minutes
+## Copy and personalize · 35 minutes
 
-1. Click **Deploy with Vercel**, using your own GitHub account for the copied repository. If asked: Framework **Other**, build command **npm run build**, output directory **public**.
-2. Keep your own URL. Open **your URL + `/start-here.html`** and the dashboard. The interface and supplied data are ready before you add keys.
-3. Open your copied repository with your coding assistant. Personalize the design and use case before connecting services. You may use a previous class dataset or the included fictional case.
-4. Push the change, wait for Vercel to deploy it and check your own URL. Try the email/Teams draft warm-up in **`/preflight.html`**. Opening a draft does not send it.
+1. Deploy the template with your own GitHub and Vercel accounts. If asked: Framework **Other**, Build command **npm run build**, Output directory **public**.
+2. Open your own website URL. The interface, data and buttons work immediately. Trying an unconfigured action shows which server variables are missing; no activation flag is needed.
+3. Open your copied repository with your coding assistant. Change the design and use case. Keep the included fictional data or optionally adapt a dataset from a previous class.
+4. Push your changes and check your own deployed URL. Keep the three levels and the action context connected.
 
-A prompt to start:
+A starting prompt:
 
-> Personalize this working Northstar Action Lab for my chosen business case. First propose a simple design and explain the action each button takes. Keep the four implemented integrations, destination previews, confirmation and independent verification. Use the included fictional data unless I provide a previous class dataset. If we change the action record, update the interface AND the server record/previews consistently, and adapt the Supabase fixture and function too. Do not change only the labels while sending the old record. Keep credentials in server settings. Show me the result and the checks you performed.
+> Personalize this working dashboard for my case. Keep Overview, Segment and Record connected. Email must use the current view, Trello the selected segment, and Supabase/GitHub the selected record. Preserve editable messages, explicit confirmation and verification. If we use another dataset, update the interface, server source/context and Supabase seed/allowed records together. Do not change labels while sending the old data. Keep credentials in server settings and show me what you tested.
 
-The supplied NS-1041 case is the ready-to-use fallback: revenue $1,200, cost $1,320 and contribution −$120. Using your own dataset is optional. Changing the dashboard alone does not change the fixed record sent by the action panel.
+The included 24 fictional orders make a complete fallback. **NS-1041** has revenue $1,200 and cost $1,320. Its audit note identifies a duplicate $240 freight charge: correcting cost to **$1,080** changes contribution from **−$120 to +$120**. This is a real numeric correction, not a reviewed-status toggle.
 
-## Four exercises, four checkpoints
+## Four contextual exercises
 
-| Exercise | Time | What you do | Checkpoint |
+| Level and action | Time | What you do | Evidence |
 | --- | --- | --- | --- |
-| 1 · Email | 30 min | Connect Resend, review the message and send one email to your own account address. | A real email ID, provider status and the message in your inbox. Accepted alone is not delivered. |
-| 2 · Supabase | 35 min | Connect your practice database and save a reviewed record. | Reload and read the saved status, request ID and timestamp again. |
-| 3 · Trello | 30 min | Connect your practice list and turn the signal into a review task. | Open the real card and compare its list, title and description. |
-| 4 · GitHub | 30 min | Connect your copied repository and propose a one-file policy change. | Open the PR and inspect **Files changed**. Nothing is merged automatically. |
+| 1 · Overview / Email | 30 min | Set the view, click **Email this view**, edit recipient, subject and message, review and confirm. | Current filters/summary in the email and the actual message in your inbox. |
+| 2 · Segment / Trello | 30 min | Click a region/category or investigate a segment. Choose **Create a Trello task**, edit title/description and confirm. | A real card with the selected segment, records and requested next step. |
+| 3 · Record / Supabase | 35 min | Open NS-1041 **Details →**, inspect its audit note, choose **Edit values in Supabase** and correct cost 1320 → 1080 with a reason. | Value saved in the database, contribution recalculated to +120, and the same value after reload/refresh. |
+| 4 · Record / GitHub issue | 30 min | Choose **Report source issue in GitHub**; edit the title/body explaining the duplicate charge and requested import fix. | A real issue containing the record and evidence. Opening it changes no source data. |
 
-With the initial 35 minutes, a 10-minute break and a 10-minute close, the workshop lasts **180 minutes**. Prepare the one-time Supabase setup with the instructor or assistant; the exercise is about connecting and checking the supplied flow. The email/Teams draft is a warm-up, not a fifth real integration exercise.
+Initial work 35 min + exercises 125 min + break 10 min + close 10 min = **180 minutes**. An email/Teams draft may be used as an optional warm-up; it is not evidence of sending. There is no PR/branch/merge exercise in this flow.
 
 ## Connect your own accounts
 
-Put each setting directly in **your Vercel project → Settings → Environment Variables → Production**, save, then **Deployments → latest deployment → Redeploy**. A copied project does not inherit the instructor’s accounts.
+Put settings in **your Vercel project → Settings → Environment Variables → Production**, save, then **Deployments → latest deployment → Redeploy**. First save `LAB_ACCESS_KEY`, a random password of **32–256 characters**, in Vercel and your password manager. It protects configured operations; it is not a provider API key. Enter it in **Connections & lab access** or the action dialog. Provider credentials stay in server settings, never in chat or committed files.
 
-Before adding provider credentials, create `LAB_ACCESS_KEY`: a random password of **at least 32 characters** saved in your password manager and Vercel. Enter that password in the action panel’s **Lab access phrase** field to authorize configured real operations. No activation flag is needed. Provider keys go only in server settings, never in chat or committed files.
-
-You can press the action buttons before setup. If a setting is missing, the result names it—for example, `RESEND_API_KEY` and `LAB_EMAIL_TO`. Add the named settings in Vercel, save, redeploy and test again. If values are present but invalid, the app identifies the settings to review. A configured service still requires your lab access phrase before any real operation.
-
-| Service | Settings in Vercel | Preparation |
+| Service | Vercel settings | Preparation |
 | --- | --- | --- |
-| Email | `RESEND_API_KEY`, `LAB_EMAIL_TO` | A Resend **Full access** key and your own account email. Sender is already `onboarding@resend.dev`. |
-| Supabase | `LAB_SUPABASE_URL`; shared `LAB_ACCESS_KEY` | Run supplied `supabase/setup.sql` once and deploy `supabase/writeback/index.ts` as `ie-action-lab-writeback`, with the hash of your own lab password. A URL alone is not enough. |
+| Email | `RESEND_API_KEY`, `LAB_EMAIL_TO` | Resend **Full access** key. LAB_EMAIL_TO is your own Resend account email. The recipient field is editable, but the current test sender only permits that configured address. |
 | Trello | `TRELLO_API_KEY`, `TRELLO_TOKEN`, `TRELLO_LIST_ID` | Your own practice list; **Trello Auth → Generate API key → Token → Allow**. |
-| GitHub | `LAB_GITHUB_TOKEN`, `LAB_GITHUB_REPOSITORY`, `LAB_GITHUB_BASE_BRANCH`, `LAB_GITHUB_POLICY_PATH` | **Only select repositories** for your copy; **Contents** and **Pull requests** read/write. **Public repositories** is read-only. |
+| Supabase | `LAB_SUPABASE_URL`; shared `LAB_ACCESS_KEY` | Run supplied `supabase/orders-setup.sql`, then deploy `supabase/orders/index.ts` as **ie-action-lab-orders**, with the hash of your own lab password and its authorization check intact. |
+| GitHub | `LAB_GITHUB_TOKEN`, `LAB_GITHUB_REPOSITORY` | A fine-grained token for **Only select repositories → your copy**, with **Issues: Read and write**. Public repository visibility alone does not authorize writes. |
 
-Use the [simple learner guide](https://ie-apps-action-lab.vercel.app/start-here.html) for the screens and [the instructor setup guide](reference/FOUR-ACTIONS.md) for exact values and supplied Supabase files. [.env.example](.env.example) lists the setting names. A configured connection is preparation; each checkpoint needs a real result.
+Follow [the simple guide](https://ie-apps-action-lab.vercel.app/start-here.html) or [the exact setup instructions](reference/FOUR-ACTIONS.md). Supabase needs its supplied table and function: a project URL alone does not deploy them. [.env.example](.env.example) lists the setting names.
 
-## Verified in the instructor’s app
+Buttons remain available without keys. After an attempt, add or correct the variables named by the error, redeploy and retry. Once a provider is configured, real operations require the correct lab phrase. **Refresh data & connections** reads the current database values and settings; it does not make a correction.
 
-On **17 November 2026**, all four real actions were checked:
+## How the numeric correction works
 
-- Email: provider delivery status and the message confirmed in the recipient’s inbox.
-- Supabase: saved record checked independently through SQL.
-- Trello: created and checked [card N3nb8mnq](https://trello.com/c/N3nb8mnq).
-- GitHub: created and verified [PR #1](https://github.com/josncmar/ie-apps-action-lab/pull/1) through the app interface.
+The app edits only **revenue, cost or refund** in the selected record. Values must be nonnegative and refund cannot exceed revenue. The request carries the value and revision you originally read. If someone has already changed the record, the server returns a conflict: reload, inspect the newer value and review again instead of overwriting it.
 
-Your copy still needs its own configuration and checks. Account billing screens were not inspected: these results do not certify a Free plan or remaining quota. The draft warm-up depends separately on each person’s email/Teams client and account.
+The function writes one field and reads it back independently. The dashboard then recalculates metrics from the saved values. After reloading, enter your lab phrase and choose **Refresh data & connections** to read the saved figures again. Local action activity is useful context, not proof of persistence. For NS-1041, a successful 1320 → 1080 correction reduces total cost by 240 and increases contribution by 240.
 
-If the outcome is unknown, inspect the existing result before repeating. Keep the request ID. The GitHub policy file is a teaching proposal; editing it does not yet change dashboard rules automatically. The lab access phrase protects a temporary classroom panel, not a complete production user system.
+## Verification status
 
-## Optional extra: ntfy notification demo
+**The new integrated flow needs its own end-to-end evidence.** Earlier standalone email/card/PR/status checks and old screenshots do not verify this dashboard flow, numeric correction or GitHub issue. Until each new result is observed, mark it pending. Each student must configure and test their own copy. Account billing screens were not inspected; functional checks do not certify a Free plan or quota.
 
-The dashboard also retains an **optional ntfy demo** and local practice mode. These are extra materials, not the four exercises above. The ntfy demo needs no provider account or environment variables and checks a fictional event in an unlisted test topic. Anyone with that topic can access it; use synthetic data only and at most two live sends per student. Provider availability and shared-network limits still apply.
-
-Local practice results are browser-local simulations. The real Supabase exercise is the path that persists a reviewed record outside the browser. Neither simulated history nor an ntfy receipt proves another integration works.
+For an uncertain outcome, inspect the existing result before sending again. Keep the request ID. For a numeric conflict, refresh and review the newer record. This classroom lab uses a shared access phrase, not a complete production user system.
 
 ## Useful files
 
 | Location | Purpose |
 | --- | --- |
-| `public/start-here.html` | Simple learner guide for the current four exercises. |
-| `public/preflight.html` | Draft warm-up and four real actions. |
-| `public/index.html`, `public/data.json` | Dashboard, fictional dataset and optional ntfy demo. |
-| `api/action-preflight.js`, `server-lib/action-preflight.mjs` | Server-side actions and verification. |
-| `reference/FOUR-ACTIONS.md` | Setup instructions and evidence. |
-| `supabase/setup.sql`, `supabase/writeback/index.ts` | Practice table and restricted write-back function. |
-| `classroom-fixtures/review-policy.json` | File changed by the PR exercise. |
+| `public/index.html`, `public/app.js` | Integrated Overview → Segment → Record interface. |
+| `public/start-here.html` | Learner guide. |
+| `api/actions.js`, `server-lib/dashboard-actions.mjs` | Contextual action previews, execution and verification. |
+| `supabase/orders-setup.sql` | Seeds 24 numeric records without overwriting existing corrections. |
+| `supabase/orders/index.ts` | Protected **ie-action-lab-orders** function with revision checks. |
+| `reference/` | Service helpers and tests. |
 
-The legacy `api/create-issue.js` reference route is not used by the working PR exercise. Your assistant’s connected accounts do not automatically authorize the deployed app.
+The old review-status table/function and PR examples are legacy materials, not the current exercise. The legacy ntfy server examples are optional reference code; the current guide follows the three-level dashboard.
 
-## Optional local development
+## Optional local work
 
-Use Node.js 22 or newer and `npm run dev`, then open http://127.0.0.1:3000. There are no npm dependencies. Your assistant can run `npm test` and `npm run build`; automated service tests use mocks and do not establish live access.
+Use Node.js 22 or newer with `npm run dev`, then open http://127.0.0.1:3000. Your assistant can run `npm test` and `npm run build`; mock tests do not establish live account access. The included dataset uses a fixed date of 2026-11-17 and contains no real customers.
 
-The included dataset has a fixed reference date of **2026-11-17**: **24 orders**, **$19,512 net revenue**, **$7,533 contribution** and **9 orders needing attention**. All records are fictional. Net revenue = revenue − refund; contribution = net revenue − cost. Count distinct flagged orders because signals can overlap.
-
-After the workshop, clear the lab access phrase from the page and revoke temporary provider tokens you no longer need. The app remains available; configured real operations still require the lab access phrase.
+After the workshop, clear the lab phrase from the page and revoke temporary provider tokens you no longer use.
 
 ## License
 
