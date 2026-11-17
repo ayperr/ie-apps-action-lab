@@ -4132,3 +4132,35 @@ button.chart-row[aria-expanded="true"]::after {
     flex-basis: auto;
   }
 }
+
+/* Ayper's operations desk: restrained blue, plain type and compact corners.
+   Contextual controls, source scope and action confirmation stay intact. */
+:root {
+  --navy: #172e46;
+  --ink: #203347;
+  --teal: #34668f;
+  --teal-dark: #254d70;
+  --mint: #edf3f8;
+  --canvas: #f6f7f9;
+  --border: #d7dfe7;
+  --radius: 6px;
+  font-family: "Segoe UI", Arial, sans-serif;
+}
+.dashboard-app .brand-symbol {
+  color: #fff; font-size: 21px; font-weight: 600;
+  border: 1px solid #97abc0; border-radius: 3px;
+  width: 30px; height: 30px; display: grid; place-items: center;
+}
+.dashboard-app .brand { letter-spacing: -.2px; }
+.dashboard-app .brand-lab { color: #d8e2ed; }
+.dashboard-app .copy-button { background: #edf3f8; }
+.dashboard-app button, .dashboard-app input, .dashboard-app select,
+.dashboard-app textarea, .dashboard-app .service-badge { border-radius: 5px; }
+.dashboard-app h1, .dashboard-app h2, .dashboard-app h3 { letter-spacing: -.02em; }
+.dashboard-app .metric-card { box-shadow: none; }
+.dashboard-app button.region-row[aria-expanded="true"],
+.dashboard-app button.chart-row[aria-expanded="true"],
+.dashboard-app tr[data-order-id]:focus-within { background: #edf3f8; }
+.dashboard-app button:focus-visible, .dashboard-app a:focus-visible,
+.dashboard-app input:focus-visible, .dashboard-app select:focus-visible,
+.dashboard-app textarea:focus-visible { outline-color: #2466a0; }
