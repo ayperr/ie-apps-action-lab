@@ -64,7 +64,8 @@ customers' upgrade payments only, and account for diverted new customers choosin
 economy plus an upgrade. Full-fare switching, upgrade demand and future request
 levels are explicit assumptions. No policy is labeled optimal. Range displays
 are scenario percentiles, not confidence intervals or proven real-world uplift.
-The extension does not modify the five frozen foundation KPIs or database records.
+The extension does not modify the five frozen foundation KPIs or booking records.
+The Session 3 extension persists the upgrade-fee assumption separately.
 
 DEPLOYMENT
 The Vercel plugin deploys public/ and api/config.js. Runtime config uses the
@@ -78,3 +79,42 @@ Automated checks cover core values, channel denominator isolation, trend/route
 reconciliation, empty/incomplete contexts, paired baseline equality, seat
 conservation and revenue accounting. Browser checks cover drilldown, Back/Reset,
 filters, data/model view, empty states, refresh failure and mobile overflow.
+
+SESSION 3 — CONTEXTUAL EMAIL AND NUMERIC WRITEBACK
+Email: api/mint-email.js sends a reviewed scope through Resend once, then attempts
+an independent provider read. Missing provider read permission is reported honestly.
+Production settings: RESEND_API_KEY, LAB_EMAIL_TO, LAB_ACCESS_KEY (32–256 chars).
+The onboarding sender permits only the configured Resend account recipient.
+Provider acceptance, delivery status and actual inbox confirmation are separate.
+
+Upgrade fee: database/upgrade-policy.sql adds 48 synthetic practice assumptions,
+one per departure, initially USD 450 to match the existing scenario default.
+Do not rerun the migration on the existing database. The public table permits
+SELECT only. The audit table has RLS and no client policies intentionally;
+service_role alone may insert/read audit rows. The save RPC is SECURITY INVOKER
+and executable only by service_role, with no anonymous write privileges.
+Add SUPABASE_SECRET_KEY as a server-only Production Secret to enable writes.
+The protected API restricts input to the upgrade-fee workflow; it does not accept
+arbitrary table names or fields. Prices must be 250–1200 in steps of 50. A reason,
+explicit review, matching old fee and revision, and a UUID request are required.
+The SQL transaction locks the departure policy and writes its audit atomically.
+An identical request ID returns the original receipt; conflicting edits are rejected.
+Uncertain outcomes are never retried automatically. Read before another attempt.
+
+Successful lab verification creates a Secure, HttpOnly, SameSite=Strict API-path
+session for one hour so protected actions work across the app's tabs. The password
+is not stored in the cookie. Clear phrase clears the session. Server keys are never
+included in /api/config, public files, source archives or screenshots.
+
+Saving a fee updates the existing 240-draw simulation. The reviewed comparison
+uses base demand, 15% switching and up to three protected seats. Other sliders
+remain temporary and are reset to those explicit assumptions after a saved read.
+Booked revenue, passengers, inventory and pickup stay unchanged. The modeled
+future revenue difference is an assumption-driven sensitivity, not measured uplift.
+
+Run: node --test tests/*.test.mjs reference/resend-email.test.mjs
+38 checks cover analytics, accounting, email, authorization, fee bounds, review,
+stale changes, readback and uncertain outcomes. SQL transaction fixtures additionally
+checked a valid save, same-request replay, invalid fee and stale conflict, then rolled
+back; no practice adjustment was retained by those tests.
+

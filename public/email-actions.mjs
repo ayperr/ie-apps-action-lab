@@ -43,7 +43,7 @@ export function createEmailActions({getContext,navigate}){
     try{reportConnection(await request());}catch{text('#email-connection-status','Could not read email connection status. No email was sent.');}finally{button.disabled=false;}
   }
   $('#email-check-connection').addEventListener('click',checkConnection);
-  $('#email-clear-phrase').addEventListener('click',()=>{phrase='';$('#email-lab-phrase').value='';text('#email-connection-status','Lab phrase cleared from memory.');});
+  $('#email-clear-phrase').addEventListener('click',async()=>{phrase='';$('#email-lab-phrase').value='';try{const response=await fetch('/api/mint-email',{method:'DELETE'});text('#email-connection-status',response.ok?'Lab phrase and verified session cleared.':'Phrase cleared; close this browser session to clear access.');}catch{text('#email-connection-status','Phrase cleared; close this browser session to clear access.');}});
   $('#email-lab-phrase').addEventListener('input',event=>{phrase=event.target.value;});
   const closeMenu=()=>{menu.hidden=true;originButton?.setAttribute('aria-expanded','false');};
   function openMenu(button){
@@ -102,5 +102,6 @@ export function createEmailActions({getContext,navigate}){
     finally{busy=false;$('#email-cancel').disabled=false;$('#email-close').disabled=false;$('#email-cancel').textContent='Close';$('#email-send').hidden=true;$('#email-consent').disabled=true;}
   });
   checkConnection();
-  return {openMenu};
+  return {openMenu,getHeaders:headers};
 }
+

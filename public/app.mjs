@@ -1,6 +1,7 @@
 import {DEFAULTS,CONTRACT,addDays,cohort,metrics,trendSeries,routeComparison,departureRows,validateDataset,checkContext,periodComparison,exploreBookings} from './analytics.mjs';
 import {createWorlds,evaluate,SEED} from './model.mjs';
 import {createEmailActions} from './email-actions.mjs';
+import {createPolicyActions} from './policy-actions.mjs';
 
 const root=document.querySelector('#view'),message=document.querySelector('#global-message');
 let data=null,loadTime=null,loading=false;
@@ -15,6 +16,15 @@ const fullDate=date=>new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric
 function readState(){const p=new URLSearchParams(location.search),s={...DEFAULTS,booking:''};for(const k of Object.keys(s))if(p.has(k))s[k]=p.get(k);if(!validViews.includes(s.view))s.view='overview';return s;}
 let state=readState();
 const emailActions=createEmailActions({getContext:()=>({data,state}),navigate});
+const policyActions=createPolicyActions({getContext:()=>({data,state}),getHeaders:emailActions.getHeaders,setPolicy:(id,price,{resetAssumptions=false}={})=>{
+  const f=data.flights.find(f=>f.id===id);if(!f)return;
+  const p=policies.get(id)||{};
+  policies.set(id,{...p,price,...(resetAssumptions?{protect:Math.min(3,f.mintCapacity-f.mintBooked),cannibalization:.15,demand:1}:{})});
+  if(state.flight!==id||!document.querySelector('#scenario-form'))return;
+  document.querySelector('#upgrade-price').value=price;
+  if(resetAssumptions){document.querySelector('#protected-seats').value=Math.min(3,f.mintCapacity-f.mintBooked);document.querySelector('#switching-rate').value=15;document.querySelector('#demand-level').value='1';}
+  runScenario();
+}});
 function navigate(changes,{replace=false,focusId=null,preserveFilters=false}={}){
   if(['route','from','to','asof','channel','q','sort'].some(k=>k in changes)&&!('page' in changes))changes.page='1';
   state={...state,...changes};const p=new URLSearchParams();for(const [k,v] of Object.entries(state))if(v!==''&&v!==DEFAULTS[k])p.set(k,v);
@@ -153,7 +163,9 @@ function render({preserveFilters=false}={}){
     checkContext(data,state);
     setView(({overview:renderOverview,pace:renderPace,mix:renderMix,detail:renderDetail,model:renderModel}[state.view])(),preserveFilters);
     document.title=(state.view==='overview'?'Overview':state.view==='detail'?state.flight:({pace:'Booking pace',mix:'Fare & channel mix',model:'Data & model'}[state.view]))+' · JetBlue Mint Revenue Lab';
-    if(state.view==='detail'&&document.querySelector('#scenario-form'))runScenario();
+    if(state.view==='detail'&&document.querySelector('#scenario-form')){
+      runScenario();root.insertAdjacentHTML('beforeend',policyActions.panel());policyActions.mount();
+    }
   }catch(error){root.innerHTML=heading('Check the selected context','The model has stopped instead of showing incomplete or misleading values.')+`<div class="notice error" role="alert">${e(error.message)}</div>`+empty('Choose a supported set of filters','Use Reset to return to the validated default portfolio.');}
 }
 function runScenario(){
@@ -232,3 +244,4 @@ async function loadData(){
   }
 }
 loadData();
+

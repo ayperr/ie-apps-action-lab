@@ -55,3 +55,9 @@ main{max-width:1368px;padding:38px 36px 28px}.page-heading{margin-bottom:28px}.e
 .email-buttons{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:10px;margin-top:20px}.email-result{border-left:3px solid #217148;padding:12px;background:#eff8f3;margin:16px 0;overflow-wrap:anywhere}.email-result p{font-size:14px;line-height:1.5;margin:6px 0}
 #email-form-status{font-size:14px;line-height:1.5;overflow-wrap:anywhere}
 @media(max-width:520px){#mint-email-dialog{padding:16px}.email-connection-fields{display:grid;grid-template-columns:1fr}.email-buttons .button{flex:1}}
+#policy-dialog{width:min(680px,calc(100vw - 32px));max-height:90vh;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:28px;color:var(--navy);background:#fff}
+#policy-dialog::backdrop{background:rgba(0,0,70,.4)}
+#policy-dialog p{line-height:1.6;margin:16px 0}
+.saved-policy{margin-top:24px}
+.saved-policy .email-field{margin:18px 0}
+
